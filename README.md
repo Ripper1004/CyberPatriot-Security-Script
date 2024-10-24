@@ -32,7 +32,7 @@ To use Git to clone this repository and run the script, follow these steps:
 
 2. **Clone the Repository**:
    ```sh
-   git clone https://github.com/your_username/Windows10-Security-Script.git
+   git clone https://github.com/Ripper1004/CyberPatriot-Security-Script.git
    cd Windows10-Security-Script
    ```
 
@@ -71,7 +71,7 @@ If you prefer to manually install Git without using Chocolatey, you can follow t
 If you cannot use Chocolatey or Git, you can manually download and run the script as follows:
 
 1. **Download the Script Manually**:
-   - Navigate to the GitHub repository (e.g., `https://github.com/your_username/Windows10-Security-Script`).
+   - Navigate to the GitHub repository (e.g., `https://github.com/Ripper1004/CyberPatriot-Security-Script`).
    - Click on the **"Code"** button, then click **"Download ZIP"**.
    - Extract the ZIP file to a location on your computer.
 
