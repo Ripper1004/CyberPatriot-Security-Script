@@ -20,15 +20,64 @@ The script performs the following actions to harden a Windows 10 machine:
 - **Administrative Privileges**: The script must be run as an administrator to make the necessary system changes.
 - **PowerShell**: Make sure you have PowerShell installed and the appropriate permissions to execute scripts.
 
-### How to Run
-1. **Clone the Repository**:
+### Installation Options
+#### Option 1: Install Git and Clone the Repository (Recommended)
+To use Git to clone this repository and run the script, follow these steps:
+
+1. **Install Chocolatey and Git**:
+   ```powershell
+   Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+   choco install git -y
+   ```
+
+2. **Clone the Repository**:
    ```sh
    git clone https://github.com/your_username/Windows10-Security-Script.git
    cd Windows10-Security-Script
    ```
 
+3. **Run the Script**:
+   - Open PowerShell **as an Administrator**.
+   - Run the script:
+   ```sh
+   .\secure_windows.ps1
+   ```
+
+#### Option 2: Manual Installation of Git (Alternative)
+If you prefer to manually install Git without using Chocolatey, you can follow these steps:
+
+1. **Download and Install Git**:
+   ```powershell
+   $gitInstaller = "https://github.com/git-for-windows/git/releases/download/v2.42.0.windows.1/Git-2.42.0-64-bit.exe"
+   $destination = "$env:TEMP\Git-Installer.exe"
+   Invoke-WebRequest -Uri $gitInstaller -OutFile $destination
+   Start-Process -FilePath $destination -ArgumentList "/SILENT" -Wait
+   ```
+
+2. **Clone the Repository**:
+   ```sh
+   git clone https://github.com/your_username/Windows10-Security-Script.git
+   cd Windows10-Security-Script
+   ```
+
+3. **Run the Script**:
+   - Open PowerShell **as an Administrator**.
+   - Run the script:
+   ```sh
+   .\secure_windows.ps1
+   ```
+
+#### Option 3: Manual Download of the Script
+If you cannot use Chocolatey or Git, you can manually download and run the script as follows:
+
+1. **Download the Script Manually**:
+   - Navigate to the GitHub repository (e.g., `https://github.com/your_username/Windows10-Security-Script`).
+   - Click on the **"Code"** button, then click **"Download ZIP"**.
+   - Extract the ZIP file to a location on your computer.
+
 2. **Run the Script**:
    - Open PowerShell **as an Administrator**.
+   - Navigate to the folder where you extracted the ZIP file.
    - Run the script:
    ```sh
    .\secure_windows.ps1
