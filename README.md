@@ -57,7 +57,7 @@ If you prefer to manually install Git without using Chocolatey, you can follow t
 2. **Clone the Repository**:
    ```sh
    git clone https://github.com/Ripper1004/CyberPatriot-Security-Script.git
-   cd Windows10-Security-Script
+   cd CyberPatriot-Security-Script
    ```
 
 3. **Run the Script**:
@@ -84,6 +84,17 @@ If you cannot use Chocolatey or Git, you can manually download and run the scrip
    ```
 
 ### Important Notes
+- **Execution Policy**: If you encounter an error about running scripts being disabled (`cannot be loaded because running scripts is disabled on this system`), you need to adjust the PowerShell execution policy:
+  - **Option 1**: Set the execution policy to allow scripts to run permanently:
+    ```powershell
+    Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+    ```
+    - When prompted, type `Y` to confirm.
+  - **Option 2**: Bypass the execution policy temporarily when running the script:
+    ```powershell
+    powershell -ExecutionPolicy Bypass -File .\secure_windows.ps1
+    ```
+
 - **Administrator Rights**: The script checks if it is running with administrative privileges. If not, it will relaunch itself with elevated permissions.
 - **Manual Verification**: While the script automates basic security hardening, manual verification is recommended to ensure all CyberPatriot-specific requirements are met.
 - **Firewall and Defender Issues**: In certain environments (e.g., virtual machines or restricted environments), some commands, such as configuring the firewall or enabling Windows Defender, may fail. Consider manually reviewing these settings if necessary.
