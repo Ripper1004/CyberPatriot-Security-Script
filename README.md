@@ -38,9 +38,9 @@ To use Git to clone this repository and run the script, follow these steps:
 
 3. **Run the Script**:
    - Open PowerShell **as an Administrator**.
-   - Run the script:
-   ```sh
-   .\secure_windows.ps1
+   - Bypass the execution policy for this script only and run it:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\secure_windows.ps1
    ```
 
 #### Option 2: Manual Installation of Git (Alternative)
@@ -62,9 +62,9 @@ If you prefer to manually install Git without using Chocolatey, you can follow t
 
 3. **Run the Script**:
    - Open PowerShell **as an Administrator**.
-   - Run the script:
-   ```sh
-   .\secure_windows.ps1
+   - Bypass the execution policy for this script only and run it:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\secure_windows.ps1
    ```
 
 #### Option 3: Manual Download of the Script
@@ -77,23 +77,13 @@ If you cannot use Chocolatey or Git, you can manually download and run the scrip
 
 2. **Run the Script**:
    - Open PowerShell **as an Administrator**.
-   - Navigate to the folder where you extracted the ZIP file.
-   - Run the script:
-   ```sh
-   .\secure_windows.ps1
+   - Bypass the execution policy for this script only and run it:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\secure_windows.ps1
    ```
 
 ### Important Notes
-- **Execution Policy**: If you encounter an error about running scripts being disabled (`cannot be loaded because running scripts is disabled on this system`), you need to adjust the PowerShell execution policy:
-  - **Option 1**: Set the execution policy to allow scripts to run permanently:
-    ```powershell
-    Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-    ```
-    - When prompted, type `Y` to confirm.
-  - **Option 2**: Bypass the execution policy temporarily when running the script:
-    ```powershell
-    powershell -ExecutionPolicy Bypass -File .\secure_windows.ps1
-    ```
+- **Execution Policy**: To run this script without permanently changing the system's execution policy, use the `-ExecutionPolicy Bypass` option when executing the script as shown above. This ensures only this instance of the script is exempt from the policy.
 
 - **Administrator Rights**: The script checks if it is running with administrative privileges. If not, it will relaunch itself with elevated permissions.
 - **Manual Verification**: While the script automates basic security hardening, manual verification is recommended to ensure all CyberPatriot-specific requirements are met.
