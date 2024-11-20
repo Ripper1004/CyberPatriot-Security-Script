@@ -1,155 +1,129 @@
-# Secure Windows 10 PowerShell Script for CyberPatriot
+# Windows Server 2022 Security Hardening Script
+# Run as Administrator
 
-# Ensure the script is running as administrator
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Warning "This script needs to be run as an administrator. Relaunching with elevated privileges..."
-    Start-Process PowerShell -ArgumentList "-File", "$PSCommandPath" -Verb RunAs
-    exit
+# Function to write logs
+function Write-Log {
+    param($Message)
+    $logMessage = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'): $Message"
+    Write-Host $logMessage
+    Add-Content -Path ".\security_hardening.log" -Value $logMessage
 }
 
-# Initialize status tracking
-$actionResults = @()
+Write-Log "Starting Windows Server 2022 Security Hardening Script"
 
-# Create Temp Directory if not exists
-try {
-    New-Item -Path C:\temp -ItemType Directory -Force
-    $actionResults += "Temp Directory Creation: Success"
-} catch {
-    $actionResults += "Temp Directory Creation: Failed - $_"
+# Ensure running as Administrator
+if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Log "Error: Script must be run as Administrator"
+    exit 1
 }
 
-# 1. Disable Unnecessary Services
-$services = @(
-    'RemoteRegistry',
-    'TermService',  # Remote Desktop Services
-    'SSDPSRV',      # SSDP Discovery
-    'WSearch',      # Windows Search (optional)
-    'RemoteAccess', # Routing and Remote Access
-    'Telnet'
+# 1. Password Policy
+Write-Log "Configuring Password Policy"
+net accounts /MINPWLEN:14 /MAXPWAGE:30 /MINPWAGE:1 /UNIQUEPW:24
+secedit /export /cfg c:\secpol.cfg
+(gc C:\secpol.cfg).replace("PasswordComplexity = 0", "PasswordComplexity = 1") | Out-File C:\secpol.cfg
+secedit /configure /db c:\windows\security\local.sdb /cfg c:\secpol.cfg /areas SECURITYPOLICY
+Remove-Item -force c:\secpol.cfg -confirm:$false
+
+# 2. Account Lockout Policy
+Write-Log "Configuring Account Lockout Policy"
+net accounts /lockoutduration:30 /lockoutthreshold:5 /lockoutwindow:30
+
+# 3. Disable Guest and Administrator accounts
+Write-Log "Disabling Guest and Administrator accounts"
+Net User Guest /Active:No
+Net User Administrator /Active:No
+
+# 4. Enable Windows Defender
+Write-Log "Configuring Windows Defender"
+Set-MpPreference -DisableRealtimeMonitoring $false
+Set-MpPreference -DisableIOAVProtection $false
+Set-MpPreference -DisableBehaviorMonitoring $false
+Set-MpPreference -DisableIntrusionPreventionSystem $false
+Set-MpPreference -DisableScriptScanning $false
+Set-MpPreference -SubmitSamplesConsent 2
+
+# 5. Configure Windows Firewall
+Write-Log "Configuring Windows Firewall"
+Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+Set-NetFirewallProfile -DefaultInboundAction Block -DefaultOutboundAction Allow -NotifyOnListen True -AllowUnicastResponseToMulticast True -LogFileName %SystemRoot%\System32\LogFiles\Firewall\pfirewall.log
+
+# 6. Enable and Configure Auditing
+Write-Log "Configuring Audit Policies"
+auditpol /set /category:* /success:enable /failure:enable
+
+# 7. Disable unnecessary services
+Write-Log "Disabling unnecessary services"
+$servicesToDisable = @(
+    "XblAuthManager",
+    "XblGameSave",
+    "XboxGipSvc",
+    "XboxNetApiSvc",
+    "RemoteRegistry",
+    "TelemetryService"
 )
-foreach ($service in $services) {
-    try {
-        $serviceStatus = Get-Service -Name $service -ErrorAction SilentlyContinue
-        if ($serviceStatus.Status -ne 'Stopped') {
-            Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue
-            Stop-Service -Name $service -ErrorAction SilentlyContinue
-        }
-        $actionResults += "Disable Service ${service}: Success"
-    } catch {
-        $actionResults += "Disable Service ${service}: Failed - $_"
-    }
+
+foreach ($service in $servicesToDisable) {
+    Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
+    Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue
 }
 
-# 2. Disable Guest Account and Unnecessary Users
-$users = @(
-    'Guest',
-    'DefaultAccount'
+# 8. Registry Hardening
+Write-Log "Applying Registry Hardening"
+# Disable Remote Desktop
+Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 1
+
+# Enable SMB Signing
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" RequireSecuritySignature -Value 1
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" EnableSecuritySignature -Value 1
+
+# Disable LLMNR
+New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows NT\DNSClient" -Force
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows NT\DNSClient" -Name "EnableMulticast" -Value 0 -Type DWord
+
+# 9. File System Security
+Write-Log "Configuring File System Security"
+# Set default NTFS permissions
+icacls C:\Windows /reset /T /C
+icacls C:\Windows\System32 /reset /T /C
+
+# 10. Enable BitLocker
+Write-Log "Configuring BitLocker"
+Enable-BitLocker -MountPoint "C:" -EncryptionMethod Aes256 -UsedSpaceOnly -RecoveryPasswordProtector
+
+# 11. Configure Windows Update
+Write-Log "Configuring Windows Update"
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoUpdate" -Value 0
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUOptions" -Value 4
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallDay" -Value 0
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallTime" -Value 3
+
+# 12. Remove unnecessary features
+Write-Log "Removing unnecessary Windows features"
+$featuresToRemove = @(
+    "Internet-Explorer-Optional-amd64",
+    "TFTP",
+    "TelnetClient",
+    "SimpleTCP"
 )
-foreach ($user in $users) {
-    try {
-        if (Get-LocalUser -Name $user -ErrorAction SilentlyContinue) {
-            Disable-LocalUser -Name $user
-        }
-        $actionResults += "Disable User ${user}: Success"
-    } catch {
-        $actionResults += "Disable User ${user}: Failed - $_"
-    }
+
+foreach ($feature in $featuresToRemove) {
+    Disable-WindowsOptionalFeature -Online -FeatureName $feature -NoRestart
 }
 
-# 3. Set Password Policies
-try {
-    secedit /export /cfg C:\temp\security_backup.cfg
-    $content = Get-Content -Path C:\temp\security_backup.cfg
-    $content = $content -replace "MinimumPasswordLength = 0", "MinimumPasswordLength = 12"
-    $content = $content -replace "PasswordComplexity = 0", "PasswordComplexity = 1"
-    $content = $content -replace "LockoutBadCount = 0", "LockoutBadCount = 5"
-    Set-Content -Path C:\temp\security_backup.cfg -Value $content
-    secedit /configure /db C:\Windows\Security\Database\SecDB.sdb /cfg C:\temp\security_backup.cfg /overwrite
-    Remove-Item -Path C:\temp\security_backup.cfg
-    $actionResults += "Set Password Policies: Success"
-} catch {
-    $actionResults += "Set Password Policies: Failed - $_"
+# 13. Configure Event Log Sizes
+Write-Log "Configuring Event Logs"
+Limit-EventLog -LogName Application -MaximumSize 32768KB
+Limit-EventLog -LogName Security -MaximumSize 81920KB
+Limit-EventLog -LogName System -MaximumSize 32768KB
+
+# Final Status
+Write-Log "Security Hardening Complete - System requires restart"
+Write-Log "Please review security_hardening.log for details"
+
+# Prompt for restart
+$restart = Read-Host "Do you want to restart the computer now? (y/n)"
+if ($restart -eq 'y') {
+    Restart-Computer -Force
 }
 
-# 4. Enable Windows Defender Real-Time Protection
-try {
-    Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Stop
-    $actionResults += "Enable Windows Defender Real-Time Protection: Success"
-} catch {
-    $actionResults += "Enable Windows Defender Real-Time Protection: Failed - $_"
-}
-
-# 5. Configure Firewall - Block all inbound connections except allowed applications
-if (Get-Command -Name Set-NetFirewallProfile -ErrorAction SilentlyContinue) {
-    try {
-        Set-NetFirewallProfile -Profile Domain,Public,Private -DefaultInboundAction Block -DefaultOutboundAction Allow -ErrorAction Stop
-
-        # Add exceptions for necessary services
-        $exceptions = @(
-            'Remote Desktop',
-            'Windows Management Instrumentation (WMI)',
-            'File and Printer Sharing'
-        )
-        foreach ($exception in $exceptions) {
-            if (Get-Command -Name Set-NetFirewallRule -ErrorAction SilentlyContinue) {
-                Set-NetFirewallRule -DisplayName $exception -Profile Domain,Public,Private -Enabled True -ErrorAction SilentlyContinue
-            }
-        }
-
-        Set-NetFirewallRule -DisplayName 'File and Printer Sharing (SMB-In)' -Enabled False -ErrorAction SilentlyContinue
-        $actionResults += "Configure Firewall: Success"
-    } catch {
-        $actionResults += "Configure Firewall: Failed - $_"
-    }
-} else {
-    $actionResults += "Configure Firewall: Skipped - Firewall cmdlets not available"
-}
-
-# 6. Disable Remote Assistance
-try {
-    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Remote Assistance' -Name fAllowToGetHelp -Value 0
-    $actionResults += "Disable Remote Assistance: Success"
-} catch {
-    $actionResults += "Disable Remote Assistance: Failed - $_"
-}
-
-# 7. Audit Policy Configuration
-try {
-    auditpol /set /category:"Account Logon" /success:enable /failure:enable
-    auditpol /set /category:"Account Management" /success:enable /failure:enable
-    auditpol /set /category:"Logon/Logoff" /success:enable /failure:enable
-    $actionResults += "Audit Policy Configuration: Success"
-} catch {
-    $actionResults += "Audit Policy Configuration: Failed - $_"
-}
-
-# 8. Disable USB Storage Access if not needed
-try {
-    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\USBSTOR' -Force
-    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\USBSTOR' -Name Start -Value 4
-    $actionResults += "Disable USB Storage Access: Success"
-} catch {
-    $actionResults += "Disable USB Storage Access: Failed - $_"
-}
-
-# 9. Remove Unnecessary Software (Example)
-$software = @(
-    'Adobe Flash Player',
-    'Java'
-)
-foreach ($app in $software) {
-    try {
-        Get-Package -Name $app -ErrorAction SilentlyContinue | ForEach-Object { Uninstall-Package -Name $_.Name -Force -ErrorAction SilentlyContinue }
-        $actionResults += "Remove Software ${app}: Success"
-    } catch {
-        $actionResults += "Remove Software ${app}: Failed - $_"
-    }
-}
-
-Write-Host "Basic Security Hardening Completed! Please verify manually for any specific CyberPatriot requirements."
-
-# Display summary of actions
-Write-Host "Summary of Actions:"
-foreach ($result in $actionResults) {
-    Write-Host $result
-}
