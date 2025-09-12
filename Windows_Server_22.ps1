@@ -93,6 +93,9 @@ Enable-BitLocker -MountPoint "C:" -EncryptionMethod Aes256 -UsedSpaceOnly -Recov
 
 # 11. Configure Windows Update
 Write-Log "Configuring Windows Update"
+New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Force | Out-Null
+Set-Service -Name wuauserv -StartupType Automatic -ErrorAction SilentlyContinue
+Start-Service -Name wuauserv -ErrorAction SilentlyContinue
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoUpdate" -Value 0
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUOptions" -Value 4
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallDay" -Value 0
@@ -116,6 +119,19 @@ Write-Log "Configuring Event Logs"
 Limit-EventLog -LogName Application -MaximumSize 32768KB
 Limit-EventLog -LogName Security -MaximumSize 81920KB
 Limit-EventLog -LogName System -MaximumSize 32768KB
+
+# 14. Disable SMBv1
+Write-Log "Disabling SMBv1"
+Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
+
+# 15. Disable NetBIOS over TCP/IP
+Write-Log "Disabling NetBIOS over TCP/IP"
+Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE" | ForEach-Object { $_.SetTcpipNetbios(2) }
+
+# 16. Disable AutoRun
+Write-Log "Disabling AutoRun"
+New-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Force | Out-Null
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoDriveTypeAutoRun" -Value 255 -Type DWord
 
 # Final Status
 Write-Log "Security Hardening Complete - System requires restart"
