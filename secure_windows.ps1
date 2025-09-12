@@ -146,6 +146,61 @@ foreach ($app in $software) {
     }
 }
 
+# 10. Enable Automatic Windows Updates
+try {
+    Set-Service -Name wuauserv -StartupType Automatic -ErrorAction SilentlyContinue
+    Start-Service -Name wuauserv -ErrorAction SilentlyContinue
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -Name NoAutoUpdate -Value 0 -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -Name AUOptions -Value 4 -ErrorAction SilentlyContinue
+    $actionResults += "Enable Automatic Windows Updates: Success"
+} catch {
+    $actionResults += "Enable Automatic Windows Updates: Failed - $_"
+}
+
+# 11. Disable SMBv1
+try {
+    Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction Stop
+    $actionResults += "Disable SMBv1: Success"
+} catch {
+    $actionResults += "Disable SMBv1: Failed - $_"
+}
+
+# 12. Enable Additional Audit Policies
+try {
+    auditpol /set /category:"Policy Change" /success:enable /failure:enable
+    auditpol /set /category:"Object Access" /success:enable /failure:enable
+    $actionResults += "Additional Audit Policies: Success"
+} catch {
+    $actionResults += "Additional Audit Policies: Failed - $_"
+}
+
+# 13. Disable LLMNR
+try {
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient' -Name EnableMulticast -Value 0 -Type DWord
+    $actionResults += "Disable LLMNR: Success"
+} catch {
+    $actionResults += "Disable LLMNR: Failed - $_"
+}
+
+# 14. Disable NetBIOS over TCP/IP
+try {
+    Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE" | ForEach-Object { $_.SetTcpipNetbios(2) }
+    $actionResults += "Disable NetBIOS over TCP/IP: Success"
+} catch {
+    $actionResults += "Disable NetBIOS over TCP/IP: Failed - $_"
+}
+
+# 15. Disable AutoRun for all drives
+try {
+    New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' -Name NoDriveTypeAutoRun -Value 255 -Type DWord
+    $actionResults += "Disable AutoRun: Success"
+} catch {
+    $actionResults += "Disable AutoRun: Failed - $_"
+}
+
 Write-Host "Basic Security Hardening Completed! Please verify manually for any specific CyberPatriot requirements."
 
 # Display summary of actions
