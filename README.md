@@ -14,6 +14,12 @@ The script performs the following actions to harden a Windows 10 machine:
 7. **Audit Policy Configuration**: Enables auditing for account logon, account management, and logon/logoff activities.
 8. **Disable USB Storage Access**: Restricts access to USB storage to prevent unauthorized data access or malware introduction.
 9. **Remove Unnecessary Software**: Uninstalls outdated or potentially vulnerable software like `Adobe Flash Player` and `Java`.
+10. **Enable Automatic Windows Updates**: Ensures Windows Update is configured to automatically download and install updates.
+11. **Disable SMBv1**: Turns off the legacy and insecure SMBv1 protocol.
+12. **Enable Additional Audit Policies**: Adds auditing for policy change and object access events.
+13. **Disable LLMNR**: Turns off Link-Local Multicast Name Resolution to reduce spoofing risks.
+14. **Disable NetBIOS over TCP/IP**: Disables legacy NetBIOS services on all network adapters.
+15. **Disable AutoRun**: Prevents automatic execution of media to mitigate autorun-based attacks.
 
 ## Running the Script
 ### Prerequisites
