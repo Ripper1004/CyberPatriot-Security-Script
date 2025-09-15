@@ -201,6 +201,37 @@ try {
     $actionResults += "Disable AutoRun: Failed - $_"
 }
 
+# 16. Disable Legacy Network Protocol Services
+$legacyServices = @(
+    'TlntSvr',  # Telnet
+    'FTPSVC',   # FTP Server
+    'Tftpd',    # TFTP
+    'W3SVC',    # HTTP Web Server (IIS)
+    'SNMP',     # SNMP v1/v2
+    'RshSvc',   # RSH
+    'Rlogon',   # Rlogin
+    'Rexsvc',   # Rexec
+    'POP3Svc',  # POP3
+    'IMAP4Svc', # IMAP
+    'NTDS',     # LDAP
+    'SMTPSVC',  # SMTP
+    'simptcp',  # Finger, Daytime, Echo, Chargen
+    'NfsClnt',  # NFS Client
+    'NfsServer' # NFS Server
+)
+foreach ($service in $legacyServices) {
+    try {
+        $svc = Get-Service -Name $service -ErrorAction SilentlyContinue
+        if ($svc -and $svc.Status -ne 'Stopped') {
+            Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue
+            Stop-Service -Name $service -ErrorAction SilentlyContinue
+        }
+        $actionResults += "Disable Legacy Service ${service}: Success"
+    } catch {
+        $actionResults += "Disable Legacy Service ${service}: Failed - $_"
+    }
+}
+
 Write-Host "Basic Security Hardening Completed! Please verify manually for any specific CyberPatriot requirements."
 
 # Display summary of actions

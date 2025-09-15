@@ -111,7 +111,39 @@ foreach ($feature in $featuresToRemove) {
     Disable-WindowsOptionalFeature -Online -FeatureName $feature -NoRestart
 }
 
-# 13. Configure Event Log Sizes
+# 13. Disable legacy network protocol services
+Write-Log "Disabling legacy network protocol services"
+$legacyServices = @(
+    "TlntSvr",  # Telnet
+    "FTPSVC",   # FTP
+    "Tftpd",    # TFTP
+    "W3SVC",    # HTTP Web Server
+    "SNMP",     # SNMP v1/v2
+    "RshSvc",   # RSH
+    "Rlogon",   # Rlogin
+    "Rexsvc",   # Rexec
+    "POP3Svc",  # POP3
+    "IMAP4Svc", # IMAP
+    "NTDS",     # LDAP
+    "SMTPSVC",  # SMTP
+    "simptcp",  # Finger, Daytime, Echo, Chargen
+    "NfsClnt",  # NFS Client
+    "NfsServer" # NFS Server
+)
+foreach ($service in $legacyServices) {
+    Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
+    Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue
+}
+
+# Disable SMBv1
+Write-Log "Disabling SMBv1"
+Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart -ErrorAction SilentlyContinue | Out-Null
+
+# Disable NetBIOS over TCP/IP
+Write-Log "Disabling NetBIOS over TCP/IP"
+Get-WmiObject -Class Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE" | ForEach-Object { $_.SetTcpipNetbios(2) } | Out-Null
+
+# 14. Configure Event Log Sizes
 Write-Log "Configuring Event Logs"
 Limit-EventLog -LogName Application -MaximumSize 32768KB
 Limit-EventLog -LogName Security -MaximumSize 81920KB
