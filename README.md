@@ -1,9 +1,22 @@
-# Windows 10 Security Hardening Script for CyberPatriot
+# Windows & Ubuntu Security Hardening Scripts for CyberPatriot
 
-This repository contains a PowerShell script designed to secure a Windows 10 system, primarily aimed at use in CyberPatriot competitions. The script includes a series of steps to disable unnecessary services, configure firewall settings, enhance password policies, and more to meet basic security standards.
+This repository contains automation to secure both Windows 10 and Ubuntu systems, primarily aimed at use in CyberPatriot competitions. The collection now includes a PowerShell script for Windows and a Bash script for Ubuntu that execute extensive hardening steps such as disabling unnecessary services, configuring host-based firewalls, enforcing strong authentication policies, and more.
+
+## Ubuntu Hardening Overview
+The `secure_ubuntu.sh` script performs the following actions to harden an Ubuntu workstation or server:
+
+1. **Package Maintenance**: Updates all installed packages, removes unused dependencies, and enables unattended security updates.
+2. **Firewall & Intrusion Prevention**: Configures UFW with a deny-by-default policy and deploys Fail2ban to automatically block repeated authentication failures.
+3. **SSH Hardening**: Enforces modern ciphers and MACs, disables root and password-based logins, and applies strict session controls.
+4. **Kernel & Filesystem Protections**: Applies sysctl tuning, hardens shared memory, and disables uncommon filesystems to limit privilege escalation paths.
+5. **Authentication Policies**: Sets password aging requirements, enforces PAM password complexity and account lockout, and deploys security banners.
+6. **Auditing & Monitoring**: Installs auditd with curated rules, deploys antivirus/rootkit scanners, and ensures AppArmor, ClamAV, and other security services start automatically.
+7. **Service Hygiene**: Purges legacy network services, restricts cron/at usage, and configures unattended upgrades for ongoing remediation.
+
+> **Important:** The Ubuntu script is intentionally strict. Review the SSH configuration changes (password logins are disabled) and adjust allow-list rules in UFW/Fail2ban before running it on production systems.
 
 ## Overview
-The script performs the following actions to harden a Windows 10 machine:
+The Windows script performs the following actions to harden a Windows 10 machine:
 
 1. **Disable Unnecessary Services**: Disables services that are not required to reduce the attack surface.
 2. **Disable Guest Account and Unnecessary Users**: Disables default accounts like `Guest` and `DefaultAccount` to prevent unauthorized access.
@@ -21,7 +34,7 @@ The script performs the following actions to harden a Windows 10 machine:
 14. **Disable NetBIOS over TCP/IP**: Disables legacy NetBIOS services on all network adapters.
 15. **Disable AutoRun**: Prevents automatic execution of media to mitigate autorun-based attacks.
 
-## Running the Script
+## Running the Windows Script
 ### Prerequisites
 - **Administrative Privileges**: The script must be run as an administrator to make the necessary system changes.
 - **PowerShell**: Make sure you have PowerShell installed and the appropriate permissions to execute scripts.
@@ -88,7 +101,7 @@ If you cannot use Chocolatey or Git, you can manually download and run the scrip
    powershell -ExecutionPolicy Bypass -File .\secure_windows.ps1
    ```
 
-### Important Notes
+### Important Notes for Windows
 - **Execution Policy**: To run this script without permanently changing the system's execution policy, use the `-ExecutionPolicy Bypass` option when executing the script as shown above. This ensures only this instance of the script is exempt from the policy.
 
 - **Administrator Rights**: The script checks if it is running with administrative privileges. If not, it will relaunch itself with elevated permissions.
@@ -118,4 +131,26 @@ This project is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## Disclaimer
 This script is provided "as is" without warranty of any kind. Use at your own risk, and always test in a non-production environment first.
+
+## Running the Ubuntu Script
+
+### Prerequisites
+- **Root Access**: Execute the script as `root` or via `sudo` to ensure every hardening step succeeds.
+- **Internet Connectivity**: Required for downloading updates and security packages such as Fail2ban, ClamAV, and auditd.
+- **Backup**: Many system configuration files are modified (backups are created with timestamps). Ensure you have snapshots or backups before running.
+
+### Usage
+1. Clone or download this repository onto the Ubuntu host.
+2. Make the script executable: `chmod +x secure_ubuntu.sh`.
+3. Run the hardening steps as root:
+   ```bash
+   sudo ./secure_ubuntu.sh
+   ```
+4. Review the console output for any warnings (some tools such as `freshclam` and `rkhunter` might require additional network access) and verify that essential services like SSH remain reachable.
+
+### Post-Run Checklist
+- Confirm that user accounts have SSH key-based access since password authentication is disabled.
+- Validate firewall rules with `sudo ufw status verbose` and add allowances for additional services as needed.
+- Examine `/etc/ssh/sshd_config.bak.*` and other `.bak` files if you need to revert any changes.
+- Run `sudo lynis audit system` for an extra security audit after the initial hardening completes.
 
