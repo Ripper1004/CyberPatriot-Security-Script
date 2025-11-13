@@ -194,18 +194,6 @@ configure_pam_pwquality() {
   fi
 }
 
-configure_account_lockout() {
-  log INFO "Configuring PAM account lockout policy"
-  apt-get install -y libpam-modules
-  local file=/etc/pam.d/common-auth
-  backup_file "$file"
-  if ! grep -Eq 'pam_tally2.so' "$file"; then
-    sed -ri '1iauth required pam_tally2.so deny=5 onerr=fail unlock_time=900' "$file"
-  else
-    sed -ri 's/^auth\s+required\s+pam_tally2.so.*/auth required pam_tally2.so deny=5 onerr=fail unlock_time=900/' "$file"
-  fi
-}
-
 configure_banners() {
   log INFO "Setting login banners"
   cat <<'EOC' >/etc/issue.net
@@ -289,7 +277,6 @@ main() {
   configure_sysctl
   configure_login_defs
   configure_pam_pwquality
-  configure_account_lockout
   configure_banners
   harden_sshd
   configure_auditd
