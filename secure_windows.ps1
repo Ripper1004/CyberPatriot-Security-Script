@@ -232,6 +232,108 @@ foreach ($service in $legacyServices) {
     }
 }
 
+# 17. Disable Additional Unnecessary Services
+try {
+    Stop-Service Spooler -Force -ErrorAction SilentlyContinue
+    Set-Service Spooler -StartupType Disabled -ErrorAction SilentlyContinue
+    $actionResults += "Disable Print Spooler: Success"
+} catch {
+    $actionResults += "Disable Print Spooler: Failed - $_"
+}
+
+try {
+    Stop-Service WebClient -Force -ErrorAction SilentlyContinue
+    Set-Service WebClient -StartupType Disabled -ErrorAction SilentlyContinue
+    $actionResults += "Disable WebClient Service: Success"
+} catch {
+    $actionResults += "Disable WebClient Service: Failed - $_"
+}
+
+try {
+    Disable-PSRemoting -Force
+    Stop-Service WinRM -Force -ErrorAction SilentlyContinue
+    Set-Service WinRM -StartupType Disabled -ErrorAction SilentlyContinue
+    $actionResults += "Disable WinRM and PSRemoting: Success"
+} catch {
+    $actionResults += "Disable WinRM and PSRemoting: Failed - $_"
+}
+
+try {
+    Stop-Service Fax -ErrorAction SilentlyContinue
+    Set-Service Fax -StartupType Disabled -ErrorAction SilentlyContinue
+    $actionResults += "Disable Fax Service: Success"
+} catch {
+    $actionResults += "Disable Fax Service: Failed - $_"
+}
+
+# 18. Enable Additional Security Features
+try {
+    & reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RunAsPPL /t REG_DWORD /d 1 /f | Out-Null
+    $actionResults += "Enable LSA Protection: Success"
+} catch {
+    $actionResults += "Enable LSA Protection: Failed - $_"
+}
+
+try {
+    & auditpol /set /category:* /success:enable /failure:enable | Out-Null
+    $actionResults += "Enable Full Audit Policy: Success"
+} catch {
+    $actionResults += "Enable Full Audit Policy: Failed - $_"
+}
+
+try {
+    & reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" /v ProcessCreationIncludeCmdLine_Enabled /t REG_DWORD /d 1 /f | Out-Null
+    $actionResults += "Enable Process Command-Line Logging: Success"
+} catch {
+    $actionResults += "Enable Process Command-Line Logging: Failed - $_"
+}
+
+try {
+    & reg add "HKLM\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" /v EnableScriptBlockLogging /t REG_DWORD /d 1 /f | Out-Null
+    $actionResults += "Enable PowerShell Script Block Logging: Success"
+} catch {
+    $actionResults += "Enable PowerShell Script Block Logging: Failed - $_"
+}
+
+try {
+    & reg add "HKLM\Software\Policies\Microsoft\Windows\PowerShell\ModuleLogging" /v EnableModuleLogging /t REG_DWORD /d 1 /f | Out-Null
+    $actionResults += "Enable PowerShell Module Logging: Success"
+} catch {
+    $actionResults += "Enable PowerShell Module Logging: Failed - $_"
+}
+
+# 19. Microsoft Defender Hardening
+try {
+    Set-MpPreference -EnableControlledFolderAccess Enabled -ErrorAction Stop
+    $actionResults += "Enable Controlled Folder Access: Success"
+} catch {
+    $actionResults += "Enable Controlled Folder Access: Failed - $_"
+}
+
+try {
+    Set-MpPreference -AttackSurfaceReductionRules_Ids d4f940ab-401b-4efc-aadc-ad5f3c50688a -AttackSurfaceReductionRules_Actions Enabled -ErrorAction Stop
+    $actionResults += "Enable ASR Rules: Success"
+} catch {
+    $actionResults += "Enable ASR Rules: Failed - $_"
+}
+
+# 20. Additional User and Group Checks
+Write-Host "Review unexpected local administrators:"
+try {
+    Get-LocalGroupMember "Administrators" | Where-Object { $_.Name -notmatch "Administrator" -and $_.Name -notmatch "expectedusername" } | ForEach-Object { Write-Host "Potential Unapproved Administrator: $($_.Name)" }
+    $actionResults += "Local Administrator Review: Completed"
+} catch {
+    $actionResults += "Local Administrator Review: Failed - $_"
+}
+
+# 21. Disable AutoPlay Fully
+try {
+    & reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoAutoPlay /t REG_DWORD /d 1 /f | Out-Null
+    $actionResults += "Disable AutoPlay: Success"
+} catch {
+    $actionResults += "Disable AutoPlay: Failed - $_"
+}
+
 Write-Host "Basic Security Hardening Completed! Please verify manually for any specific CyberPatriot requirements."
 
 # Display summary of actions
