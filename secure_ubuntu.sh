@@ -268,6 +268,54 @@ purge_insecure_services() {
   apt-get purge -y telnetd xinetd rsh-server rlogin-server talk-server vsftpd || true
 }
 
+apply_additional_hardening() {
+  log INFO "Applying additional Linux Mint 22 hardening measures"
+
+  log INFO "Disabling unnecessary network services"
+  systemctl disable --now cups || log WARN "cups service could not be disabled"
+  systemctl disable --now avahi-daemon || log WARN "avahi-daemon service could not be disabled"
+  systemctl disable --now smbd nmbd 2>/dev/null || log WARN "Samba services could not be disabled or were not present"
+
+  log INFO "Blocking USB storage modules"
+  echo "blacklist usb-storage" >/etc/modprobe.d/disable-usb-storage.conf
+  update-initramfs -u
+
+  log INFO "Checking for unauthorized privileged accounts"
+  awk -F: '$3 == 0 && $1 != "root" {print "WARNING: Extra UID 0:", $1}' /etc/passwd
+
+  log INFO "Reviewing sudoers for NOPASSWD entries"
+  grep -R "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null || log INFO "No NOPASSWD entries detected"
+
+  log INFO "Enforcing critical file permissions"
+  chmod 640 /etc/shadow
+  chmod 644 /etc/passwd
+  chmod 600 /etc/ssh/ssh_host_*key 2>/dev/null || true
+
+  log INFO "Disabling Ctrl+Alt+Del reboot sequence"
+  systemctl mask ctrl-alt-del.target || log WARN "Failed to mask ctrl-alt-del.target"
+
+  log INFO "Augmenting auditd rules"
+  {
+    echo "-w /etc/passwd -p wa -k passwd_changes"
+    echo "-w /etc/shadow -p wa -k shadow_changes"
+    echo "-w /etc/sudoers -p wa -k sudoers_changes"
+    echo "-w /usr/bin/sudo -p x -k sudo_exec"
+  } >>/etc/audit/rules.d/hardening.rules
+  augenrules --load
+
+  log INFO "Scanning for potentially unauthorized security tools"
+  dpkg -l | egrep -i "netcat|nc |john|hydra|aircrack|ophcrack|metasploit|nmap|tcpdump|wireshark|nikto" || log INFO "No suspicious packages from list detected"
+
+  log INFO "Removing world-writable files under /etc"
+  find /etc -perm -002 -type f -exec chmod o-w {} \; || true
+
+  log INFO "Restoring default hosts file entries"
+  {
+    echo "127.0.0.1 localhost"
+    echo "::1       localhost"
+  } >/etc/hosts
+}
+
 main() {
   log INFO "Starting Ubuntu security hardening"
   update_and_upgrade
@@ -284,6 +332,7 @@ main() {
   disable_unnecessary_filesystems
   secure_cron_and_at
   purge_insecure_services
+  apply_additional_hardening
   install_security_tools
   log INFO "Security hardening completed. Review logs for details."
 }
