@@ -132,6 +132,9 @@ harden_sshd() {
   update_sshd_config_option "PermitRootLogin" "no" "$sshd_config"
   update_sshd_config_option "PasswordAuthentication" "no" "$sshd_config"
   update_sshd_config_option "ChallengeResponseAuthentication" "no" "$sshd_config"
+  update_sshd_config_option "PermitEmptyPasswords" "no" "$sshd_config"
+  update_sshd_config_option "IgnoreRhosts" "yes" "$sshd_config"
+  update_sshd_config_option "HostbasedAuthentication" "no" "$sshd_config"
   update_sshd_config_option "UsePAM" "yes" "$sshd_config"
   update_sshd_config_option "X11Forwarding" "no" "$sshd_config"
   update_sshd_config_option "ClientAliveInterval" "300" "$sshd_config"
@@ -140,6 +143,7 @@ harden_sshd() {
   update_sshd_config_option "MaxAuthTries" "3" "$sshd_config"
   update_sshd_config_option "AllowTcpForwarding" "no" "$sshd_config"
   update_sshd_config_option "PrintMotd" "no" "$sshd_config"
+  update_sshd_config_option "Banner" "/etc/issue.net" "$sshd_config"
   update_sshd_config_option "KexAlgorithms" "curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256" "$sshd_config"
   update_sshd_config_option "Ciphers" "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com" "$sshd_config"
   update_sshd_config_option "MACs" "hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com" "$sshd_config"
@@ -156,8 +160,14 @@ net.ipv4.conf.all.accept_source_route = 0
 net.ipv4.conf.default.accept_source_route = 0
 net.ipv4.conf.all.accept_redirects = 0
 net.ipv4.conf.default.accept_redirects = 0
-net.ipv4.conf.all.secure_redirects = 1
-net.ipv4.conf.default.secure_redirects = 1
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.default.secure_redirects = 0
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.ip_forward = 0
+net.ipv6.conf.all.accept_redirects = 0
+net.ipv6.conf.default.accept_redirects = 0
+net.ipv6.conf.all.accept_source_route = 0
 net.ipv4.conf.all.log_martians = 1
 net.ipv4.conf.default.log_martians = 1
 net.ipv4.icmp_echo_ignore_broadcasts = 1
@@ -192,6 +202,36 @@ configure_pam_pwquality() {
   else
     sed -ri 's/^password\s+\[success=1 default=ignore\]\s+pam_unix.so/password requisite pam_pwquality.so retry=3 minlen=12 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1\n&/' "$file"
   fi
+}
+
+configure_account_lockout() {
+  log INFO "Configuring account lockout via PAM"
+  local auth=/etc/pam.d/common-auth
+  backup_file "$auth"
+  if ! grep -q "pam_tally2.so\|pam_faillock.so" "$auth"; then
+    sed -ri '0,/^auth\s/s//auth required pam_faillock.so preauth silent audit deny=5 unlock_time=900\n&/' "$auth"
+    echo "auth [default=die] pam_faillock.so authfail audit deny=5 unlock_time=900" >>"$auth"
+  fi
+}
+
+configure_shell_timeout() {
+  log INFO "Setting shell timeout (TMOUT=900)"
+  if ! grep -q "^TMOUT=" /etc/profile; then
+    cat <<'EOC' >>/etc/profile
+
+# Auto-logout idle sessions after 15 minutes
+TMOUT=900
+readonly TMOUT
+export TMOUT
+EOC
+  fi
+}
+
+configure_core_dumps() {
+  log INFO "Restricting core dumps"
+  cat <<'EOC' >/etc/security/limits.d/99-no-core-dumps.conf
+* hard core 0
+EOC
 }
 
 configure_banners() {
@@ -325,6 +365,9 @@ main() {
   configure_sysctl
   configure_login_defs
   configure_pam_pwquality
+  configure_account_lockout
+  configure_shell_timeout
+  configure_core_dumps
   configure_banners
   harden_sshd
   configure_auditd
