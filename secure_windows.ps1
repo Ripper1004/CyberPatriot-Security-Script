@@ -317,7 +317,80 @@ try {
     $actionResults += "Enable ASR Rules: Failed - $_"
 }
 
-# 20. Additional User and Group Checks
+# 20. Disable WDigest (prevents clear-text passwords in memory)
+try {
+    & reg add "HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest" /v UseLogonCredential /t REG_DWORD /d 0 /f | Out-Null
+    $actionResults += "Disable WDigest: Success"
+} catch {
+    $actionResults += "Disable WDigest: Failed - $_"
+}
+
+# 21. Disable Windows Installer AlwaysInstallElevated
+try {
+    & reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Installer" /v AlwaysInstallElevated /t REG_DWORD /d 0 /f | Out-Null
+    & reg add "HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer" /v AlwaysInstallElevated /t REG_DWORD /d 0 /f | Out-Null
+    $actionResults += "Disable AlwaysInstallElevated: Success"
+} catch {
+    $actionResults += "Disable AlwaysInstallElevated: Failed - $_"
+}
+
+# 22. Set NTLMv2 only authentication
+try {
+    & reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v LmCompatibilityLevel /t REG_DWORD /d 5 /f | Out-Null
+    & reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v NoLMHash /t REG_DWORD /d 1 /f | Out-Null
+    $actionResults += "Set NTLMv2 Only: Success"
+} catch {
+    $actionResults += "Set NTLMv2 Only: Failed - $_"
+}
+
+# 23. Enable SMB Signing (client and server)
+try {
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" -Name RequireSecuritySignature -Value 1
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" -Name EnableSecuritySignature -Value 1
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters" -Name RequireSecuritySignature -Value 1
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters" -Name EnableSecuritySignature -Value 1
+    $actionResults += "Enable SMB Signing: Success"
+} catch {
+    $actionResults += "Enable SMB Signing: Failed - $_"
+}
+
+# 24. Disable anonymous enumeration of SAM accounts and shares
+try {
+    & reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RestrictAnonymousSAM /t REG_DWORD /d 1 /f | Out-Null
+    & reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RestrictAnonymous /t REG_DWORD /d 1 /f | Out-Null
+    & reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v EveryoneIncludesAnonymous /t REG_DWORD /d 0 /f | Out-Null
+    $actionResults += "Restrict Anonymous Access: Success"
+} catch {
+    $actionResults += "Restrict Anonymous Access: Failed - $_"
+}
+
+# 25. Enable PUA protection in Defender
+try {
+    Set-MpPreference -PUAProtection Enabled -ErrorAction Stop
+    $actionResults += "Enable PUA Protection: Success"
+} catch {
+    $actionResults += "Enable PUA Protection: Failed - $_"
+}
+
+# 26. Disable PowerShell v2 (prevents downgrade attacks)
+try {
+    Disable-WindowsOptionalFeature -Online -FeatureName MicrosoftWindowsPowerShellV2Root -NoRestart -ErrorAction Stop
+    $actionResults += "Disable PowerShell v2: Success"
+} catch {
+    $actionResults += "Disable PowerShell v2: Failed - $_"
+}
+
+# 27. Configure Event Log sizes
+try {
+    Limit-EventLog -LogName Application -MaximumSize 32768KB
+    Limit-EventLog -LogName Security -MaximumSize 81920KB
+    Limit-EventLog -LogName System -MaximumSize 32768KB
+    $actionResults += "Configure Event Log Sizes: Success"
+} catch {
+    $actionResults += "Configure Event Log Sizes: Failed - $_"
+}
+
+# 28. Additional User and Group Checks
 Write-Host "Review unexpected local administrators:"
 try {
     Get-LocalGroupMember "Administrators" | Where-Object { $_.Name -notmatch "Administrator" -and $_.Name -notmatch "expectedusername" } | ForEach-Object { Write-Host "Potential Unapproved Administrator: $($_.Name)" }

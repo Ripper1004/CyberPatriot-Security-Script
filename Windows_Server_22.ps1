@@ -81,7 +81,43 @@ Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Par
 New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows NT\DNSClient" -Force
 Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows NT\DNSClient" -Name "EnableMulticast" -Value 0 -Type DWord
 
-# 9. File System Security
+# 9. Advanced Security Settings
+Write-Log "Applying advanced security hardening"
+# Enable LSA Protection
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RunAsPPL /t REG_DWORD /d 1 /f | Out-Null
+# Disable WDigest (clear-text passwords in memory)
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest" /v UseLogonCredential /t REG_DWORD /d 0 /f | Out-Null
+# Set NTLMv2 only
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v LmCompatibilityLevel /t REG_DWORD /d 5 /f | Out-Null
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v NoLMHash /t REG_DWORD /d 1 /f | Out-Null
+# Restrict anonymous access
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RestrictAnonymousSAM /t REG_DWORD /d 1 /f | Out-Null
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RestrictAnonymous /t REG_DWORD /d 1 /f | Out-Null
+# Enable process creation command-line logging
+reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" /v ProcessCreationIncludeCmdLine_Enabled /t REG_DWORD /d 1 /f | Out-Null
+# Enable PowerShell script block and module logging
+reg add "HKLM\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" /v EnableScriptBlockLogging /t REG_DWORD /d 1 /f | Out-Null
+reg add "HKLM\Software\Policies\Microsoft\Windows\PowerShell\ModuleLogging" /v EnableModuleLogging /t REG_DWORD /d 1 /f | Out-Null
+# Disable AutoRun and AutoPlay
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f | Out-Null
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoAutoPlay /t REG_DWORD /d 1 /f | Out-Null
+# Disable Remote Assistance
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Remote Assistance" /v fAllowToGetHelp /t REG_DWORD /d 0 /f | Out-Null
+
+# 10. Disable PowerShell v2 (prevents downgrade attacks)
+Write-Log "Disabling PowerShell v2"
+Disable-WindowsOptionalFeature -Online -FeatureName MicrosoftWindowsPowerShellV2Root -NoRestart -ErrorAction SilentlyContinue | Out-Null
+
+# 11. Disable USB Storage
+Write-Log "Disabling USB storage"
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\USBSTOR" /v Start /t REG_DWORD /d 4 /f | Out-Null
+
+# 12. Configure Windows Defender Hardening
+Write-Log "Hardening Windows Defender"
+Set-MpPreference -PUAProtection Enabled -ErrorAction SilentlyContinue
+Set-MpPreference -EnableControlledFolderAccess Enabled -ErrorAction SilentlyContinue
+
+# 13. File System Security
 Write-Log "Configuring File System Security"
 # Set default NTFS permissions
 icacls C:\Windows /reset /T /C
