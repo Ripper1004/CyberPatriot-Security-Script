@@ -1,0 +1,138 @@
+# Using the scripts safely
+
+There is one script per OS family:
+
+| Script | Works on |
+|---|---|
+| `scripts/linux/harden.sh` | Linux Mint 20–22, Debian 11–12, Ubuntu 20.04–24.04 |
+| `scripts/windows/Harden.ps1` | Windows 10, Windows 11, Windows Server 2016 / 2019 / 2022 (including Domain Controllers) |
+| `scripts/freebsd/harden.sh` | FreeBSD 13 / 14 |
+
+All three work the same way:
+
+1. They ask you for the README info first: **admins, users, critical services**.
+2. **Audit mode** only *reports* problems. It changes nothing, so it's safe to run any time.
+3. **Apply mode** fixes problems. It asks before anything risky (deleting a user, uninstalling a program, deleting files).
+4. Every file or setting is **backed up** before it's changed.
+5. At the end you get a **summary** and a **findings report**, your to-do list of things a human has to decide.
+
+> [!IMPORTANT]
+> The scripts never delete or disable anything you list as authorized or critical. But **they only know what you type in.** If you misspell a user's name, the script thinks that user is unauthorized. Double-check the names!
+
+## What the results mean
+
+| Result | Meaning |
+|---|---|
+| `OK` | Already secure. Nothing to do. |
+| `CHANGED` | The script fixed it. |
+| `WOULD` | (Audit mode) The script would fix this in Apply mode. |
+| `SKIPPED` | Not done, because you said no or it didn't apply. |
+| `REVIEW` | **A human needs to look at this.** It's in the findings report. |
+| `FAILED` | It tried and failed. The log file says why. Fix it by hand using the checklist. |
+
+---
+
+## Linux (Mint / Debian / Ubuntu)
+
+### 1. Get the toolkit onto the image
+**Option A, with git** (if it's installed):
+```bash
+git clone https://github.com/Ripper1004/CyberPatriot-Security-Script.git
+cd CyberPatriot-Security-Script/scripts/linux
+```
+**Option B, download the ZIP:** in Firefox go to the GitHub page, click **Code → Download ZIP**, then:
+```bash
+cd ~/Downloads
+unzip CyberPatriot-Security-Script-main.zip
+cd CyberPatriot-Security-Script-main/scripts/linux
+```
+
+### 2. Run it
+```bash
+sudo bash harden.sh
+```
+On **Debian**, if `sudo` says you're not allowed, use `su -` first (it asks for the **root** password), then run `bash harden.sh` without `sudo`.
+
+The script asks for the README info, then shows a menu. It starts in **AUDIT** mode:
+```
+ 1) Users and groups
+ 2) Password and lockout policy
+ ...
+ a) Run ALL sections
+ m) Switch to APPLY mode (make changes)
+```
+- Type `a` to audit everything. Read the output.
+- Type `m` to switch to APPLY mode, then `a` again (or a number like `1` to do one section).
+
+### 3. Optional: use a config file instead of typing
+```bash
+cp config.example.conf my.conf
+nano my.conf            # fill in the names from the README, save with Ctrl+O, exit with Ctrl+X
+sudo bash harden.sh --audit --config my.conf
+sudo bash harden.sh --apply --config my.conf
+```
+
+### 4. Read the results
+```bash
+sudo cat /root/cyberpatriot/findings-*.txt      # your to-do list
+sudo less /root/cyberpatriot/harden-*.log       # everything that happened (q to quit)
+```
+
+### Undoing a change
+Every edited file is copied to `/root/cyberpatriot/backups/<date-time>/` with its full path. To put one back:
+```bash
+sudo cp -a /root/cyberpatriot/backups/20261022-140501/etc/ssh/sshd_config /etc/ssh/sshd_config
+```
+
+---
+
+## Windows
+
+### 1. Get the toolkit onto the image
+1. In Edge, go to the GitHub page and click **Code → Download ZIP**.
+2. Open **Downloads**, right-click the ZIP and choose **Extract All**.
+
+### 2. Open PowerShell as Administrator
+Click **Start**, type `powershell`, then choose **Run as administrator**.
+
+### 3. Run it
+```powershell
+cd $HOME\Downloads\CyberPatriot-Security-Script-main\CyberPatriot-Security-Script-main\scripts\windows
+powershell -ExecutionPolicy Bypass -File .\Harden.ps1
+```
+`-ExecutionPolicy Bypass` lets this one script run without changing the computer's script policy.
+
+The menu works like the Linux one: it starts in **Audit** mode, `a` runs everything, and `m` switches to Apply.
+
+### 4. Optional: config file
+```powershell
+copy config.example.psd1 my-readme.psd1
+notepad my-readme.psd1
+powershell -ExecutionPolicy Bypass -File .\Harden.ps1 -Mode Audit -Config .\my-readme.psd1
+powershell -ExecutionPolicy Bypass -File .\Harden.ps1 -Mode Apply -Config .\my-readme.psd1
+```
+
+### 5. Read the results
+Everything is in `C:\harden-toolkit\`:
+- `findings-*.txt`: your to-do list
+- `harden-*.log`: everything that happened
+- `backups\<date-time>\`: registry exports (`.reg` files: double-click one to put the old settings back) and the old security policy.
+
+---
+
+## FreeBSD
+
+```sh
+su -
+fetch https://github.com/Ripper1004/CyberPatriot-Security-Script/archive/refs/heads/main.zip
+unzip main.zip && cd CyberPatriot-Security-Script-main/scripts/freebsd
+sh harden.sh
+```
+
+---
+
+## Golden rules
+1. **Forensics questions first**, then the script.
+2. **Audit before Apply.** Read the REVIEW items.
+3. **Check the Scoring Report** after running Apply. If the score went **down**, find the change that caused it (the log has a timestamp for every change) and undo it from the backups.
+4. The script is a starting point. **Use the checklist** for everything it marks REVIEW and for things scripts can't detect.
