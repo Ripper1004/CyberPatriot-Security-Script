@@ -240,12 +240,12 @@ The checklists are for **people who have never done this before**. Every OS gets
 ## 6. Order of work
 
 1. ✅ Close the superseded PRs (#1 and #3).
-2. Linux script, which covers Mint 21 and Debian 12, the two most common Linux images.
-3. Windows script, which covers 10/11 and Server.
-4. Checklists and guides: Mint and Windows 11 first, then Server, Debian, Ubuntu and FreeBSD.
-5. FreeBSD script.
-6. New README; remove the old scripts and checklists. They stay in the git history.
-7. *(Later)* Website.
+2. ✅ Linux script. It passes 54/54 checks in Debian 12, Ubuntu 22.04 and Mint 21.3 containers.
+3. ✅ Windows script. It passes 38/38 logic tests, parses cleanly, and is PS 5.1-compatible. **Still needs a real run in Audit mode on a Windows practice image.**
+4. ✅ Checklists and guides for all six OSes, plus beginner guides.
+5. ✅ FreeBSD script (shellcheck clean). **Still needs a real run on FreeBSD.**
+6. ✅ New README; the old scripts and checklists are removed (they stay in the git history).
+7. ⏳ *(Next)* Website.
 
 ## 7. Things the repo owner needs to do by hand
 - **Delete the 8 stale branches.** This session can't delete branches. Go to GitHub → the repo → **Branches** and click the 🗑️ next to:
