@@ -1,0 +1,681 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { CHECKLISTS, IMAGE_NAMES, lessons, pages, roundsFor, SEASON, totalSteps } from '../data/site';
+
+const osMark: Record<string, string> = {
+  windows: 'W',
+  server: 'WS',
+  mint: 'LM',
+  debian: 'D',
+  freebsd: 'BSD',
+  ubuntu: 'U',
+};
+
+const tools = [
+  {
+    href: '/tools/config-builder/',
+    icon: '⚙️',
+    title: 'README config builder',
+    text: 'Paste the README’s user list and get a ready-to-use config file and the exact commands to run the script.',
+  },
+  {
+    href: '/tools/round-timer/',
+    icon: '⏱️',
+    title: 'Round timer',
+    text: 'A 4-hour countdown that tells you which phase of the game plan you should be in. Projector-friendly.',
+  },
+  {
+    href: '/tools/commands/',
+    icon: '⌨️',
+    title: 'Command finder',
+    text: 'Search the important Linux, Windows and FreeBSD commands by what you want to do. One-click copy.',
+  },
+  {
+    href: '/tools/glossary-quiz/',
+    icon: '🧠',
+    title: 'Glossary quiz',
+    text: 'Flashcards and a quick quiz for the words you’ll see everywhere: PAM, UAC, SUID, GPO…',
+  },
+  {
+    href: '/downloads/',
+    icon: '⬇️',
+    title: 'Download the scripts',
+    text: 'The hardening scripts with one-line download commands for the practice VM and checksums.',
+  },
+  {
+    href: '/progress/',
+    icon: '📈',
+    title: 'My progress',
+    text: 'Everything you’ve ticked off, in one place. Export it to hand in, or reset for a new image.',
+  },
+];
+
+const rules = [
+  { n: '01', title: 'Read the README twice', text: 'Write down the authorized admins, users and critical services before you touch anything.' },
+  { n: '02', title: 'Forensics first', text: 'Answer the forensics questions before fixing things, or you may delete the evidence.' },
+  { n: '03', title: 'Snapshot, then change', text: 'Take a VM snapshot at the start and whenever your score jumps.' },
+  { n: '04', title: 'Score went down? Undo', text: 'A drop means a penalty. Undo your last change and check the Scoring Report again.' },
+];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'CyberPatriot Practice Toolkit',
+    description:
+      'Beginner-friendly CyberPatriot practice: step-by-step checklists, lessons, tools and hardening scripts for Windows, Windows Server, Linux Mint, Debian and FreeBSD.',
+    template: 'splash',
+    editUrl: false,
+    hero: {
+      title: 'Learn to secure a computer, <em>one step at a time.</em>',
+      tagline:
+        'Step-by-step checklists, beginner lessons, practice tools and hardening scripts for every CyberPatriot operating system. Built for people who have never done this before.',
+    },
+  }}
+>
+  <div class="cp-home not-content">
+    <!-- Continue where you left off (filled in by the script) -->
+    <a class="cp-continue" href="/" data-cp-continue hidden>
+      <span class="cp-continue__label">Continue where you left off</span>
+      <span class="cp-continue__title" data-cp-continue-title></span>
+      <span class="cp-continue__meta" data-cp-continue-meta></span>
+      <span class="cp-continue__arrow" aria-hidden="true">→</span>
+    </a>
+
+    <!-- Stats -->
+    <dl class="cp-stats">
+      <div><dt>Checklists</dt><dd>{CHECKLISTS.length}</dd></div>
+      <div><dt>Step-by-step items</dt><dd>{totalSteps}</dd></div>
+      <div><dt>Beginner lessons</dt><dd>{lessons.length}</dd></div>
+      <div><dt>Hardening scripts</dt><dd>3</dd></div>
+    </dl>
+
+    <!-- Learning path -->
+    <section class="cp-home__section" aria-labelledby="path-title">
+      <div class="cp-home__head">
+        <div>
+          <h2 id="path-title" class="cp-section-title">New here? Follow the path</h2>
+          <p class="cp-section-sub">
+            Seven short lessons, about {lessons.reduce((n, l) => n + l.minutes, 0)} minutes in total. Do them in order
+            before your first practice image.
+          </p>
+        </div>
+        <p class="cp-home__count" data-cp-path-count>0 of {lessons.length} read</p>
+      </div>
+      <ol class="cp-path">
+        {
+          lessons.map((l) => (
+            <li>
+              <a class="cp-path__item" href={l.route} data-cp-path-item={l.id}>
+                <span class="cp-path__n" aria-hidden="true">
+                  <span class="cp-path__num">{l.n}</span>
+                  <span class="cp-path__check">✓</span>
+                </span>
+                <span class="cp-path__body">
+                  <span class="cp-path__title">{l.label}</span>
+                  <span class="cp-path__meta">
+                    {l.minutes} min read<span class="cp-path__read"> · read</span>
+                  </span>
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <!-- Checklists -->
+    <section class="cp-home__section" id="checklists" aria-labelledby="cl-title">
+      <div class="cp-home__head">
+        <div>
+          <h2 id="cl-title" class="cp-section-title">Pick your checklist</h2>
+          <p class="cp-section-sub">
+            One per operating system. Each step says what to do, why, how to do it by clicking or typing, and how to check
+            it worked.
+          </p>
+        </div>
+        <div class="cp-segmented" role="group" aria-label="Show checklists for a round" data-cp-round-filter>
+          <button type="button" aria-pressed="true" data-round="all">All</button>
+          {
+            SEASON.rounds.map((r) => (
+              <button type="button" aria-pressed="false" data-round={r.id}>
+                {r.name.replace(' Round', '')}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+      <div class="cp-grid cp-os-grid">
+        {
+          CHECKLISTS.map((c) => {
+            const rounds = roundsFor(c.image);
+            const page = pages[`checklists/${c.id}`];
+            return (
+              <a
+                class={`cp-card cp-os cp-os--${c.image}`}
+                href={`/checklists/${c.id}/`}
+                data-cp-os={c.image}
+                data-rounds={rounds.map((r) => r.id).join(' ')}
+                data-cp-page={`checklists/${c.id}`}
+                data-total={page.steps}
+              >
+                <div class="cp-os__top">
+                  <span class="cp-os__mark" aria-hidden="true">
+                    {osMark[c.image]}
+                  </span>
+                  <div>
+                    <h3 class="cp-card__title">{c.name}</h3>
+                    <p class="cp-os__image">{rounds.length ? `CP-19 image: ${IMAGE_NAMES[c.image]}` : 'Older practice images'}</p>
+                  </div>
+                </div>
+                <p class="cp-card__text">{c.blurb}</p>
+                <div class="cp-os__rounds">
+                  {rounds.length ? (
+                    rounds.map((r) => <span class="cp-pill">{r.name}</span>)
+                  ) : (
+                    <span class="cp-pill cp-pill--muted">Not in CP-19</span>
+                  )}
+                </div>
+                <div class="cp-os__progress">
+                  <div class="cp-bar">
+                    <span class="cp-bar__fill" style="width:0%" />
+                  </div>
+                  <span class="cp-os__count" data-cp-os-count>
+                    {page.steps} steps
+                  </span>
+                </div>
+              </a>
+            );
+          })
+        }
+      </div>
+    </section>
+
+    <!-- Season -->
+    <section class="cp-home__section" aria-labelledby="season-title">
+      <h2 id="season-title" class="cp-section-title">{SEASON.name} at a glance</h2>
+      <p class="cp-section-sub">Which images appear in which round this season ({SEASON.years}), for reference.</p>
+      <ol class="cp-timeline">
+        {
+          SEASON.rounds.map((r) => (
+            <li class="cp-timeline__item">
+              <p class="cp-timeline__dates">{r.dates}</p>
+              <p class="cp-timeline__name">{r.name}</p>
+              <div class="cp-timeline__images">
+                {r.images.map((img) => {
+                  const c = CHECKLISTS.find((x) => x.image === img);
+                  return c ? (
+                    <a class={`cp-chip cp-chip--${img}`} href={`/checklists/${c.id}/`}>
+                      {IMAGE_NAMES[img]}
+                    </a>
+                  ) : null;
+                })}
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <!-- Tools -->
+    <section class="cp-home__section" aria-labelledby="tools-title">
+      <h2 id="tools-title" class="cp-section-title">Tools that make practice easier</h2>
+      <p class="cp-section-sub">Everything runs in your browser. Nothing you type is sent anywhere.</p>
+      <div class="cp-grid">
+        {
+          tools.map((t) => (
+            <a class="cp-card cp-tool" href={t.href}>
+              <span class="cp-tool__icon" aria-hidden="true">
+                {t.icon}
+              </span>
+              <h3 class="cp-card__title">{t.title}</h3>
+              <p class="cp-card__text">{t.text}</p>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- Golden rules -->
+    <section class="cp-home__section" aria-labelledby="rules-title">
+      <h2 id="rules-title" class="cp-section-title">The four golden rules</h2>
+      <p class="cp-section-sub">
+        Most lost points come from breaking these. Read the full list in <a href="/guides/things-that-lose-points/"
+          >Things that lose points</a
+        >.
+      </p>
+      <div class="cp-rules">
+        {
+          rules.map((r) => (
+            <div class="cp-rule">
+              <span class="cp-rule__n">{r.n}</span>
+              <h3 class="cp-rule__title">{r.title}</h3>
+              <p class="cp-rule__text">{r.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <p class="cp-home__legal">
+      This toolkit is for <strong>practice and learning</strong> on practice virtual machines. CyberPatriot 19 rules say
+      AI-assisted scripts may not be used in competition rounds and CyberPatriot scripts may not be posted publicly. <a
+        href="/about/">More about this site</a
+      >.
+    </p>
+  </div>
+</StarlightPage>
+
+<script>
+  import { getDoneSteps, getLast, getReadLessons, onProgressChange } from '../scripts/store';
+
+  const lessonCount = document.querySelectorAll('[data-cp-path-item]').length;
+
+  function render() {
+    // Learning path
+    const read = getReadLessons();
+    let n = 0;
+    document.querySelectorAll<HTMLElement>('[data-cp-path-item]').forEach((el) => {
+      const isRead = read.has(el.dataset.cpPathItem as string);
+      el.classList.toggle('is-read', isRead);
+      if (isRead) n++;
+    });
+    const count = document.querySelector('[data-cp-path-count]');
+    if (count) count.textContent = `${n} of ${lessonCount} read`;
+    // Make the first unread lesson stand out
+    const firstUnread = [...document.querySelectorAll<HTMLElement>('[data-cp-path-item]')].find((el) => !el.classList.contains('is-read'));
+    document.querySelectorAll('.cp-path__item.is-next').forEach((el) => el.classList.remove('is-next'));
+    firstUnread?.classList.add('is-next');
+
+    // Checklist cards
+    document.querySelectorAll<HTMLElement>('.cp-os[data-cp-page]').forEach((card) => {
+      const total = Number(card.dataset.total);
+      const done = getDoneSteps(card.dataset.cpPage as string).size;
+      const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+      card.querySelector<HTMLElement>('.cp-bar__fill')!.style.width = `${pct}%`;
+      card.querySelector('.cp-bar')!.classList.toggle('is-complete', pct === 100);
+      card.querySelector('[data-cp-os-count]')!.textContent = done ? `${done} / ${total} done` : `${total} steps`;
+    });
+
+    // Continue banner
+    const last = getLast();
+    const banner = document.querySelector<HTMLAnchorElement>('[data-cp-continue]');
+    const card = last && document.querySelector<HTMLElement>(`.cp-os[data-cp-page="${last.page}"]`);
+    if (banner && card) {
+      const total = Number(card.dataset.total);
+      const done = getDoneSteps(last.page).size;
+      if (done > 0 && done < total) {
+        banner.href = card.getAttribute('href') ?? '/';
+        banner.querySelector('[data-cp-continue-title]')!.textContent = card.querySelector('.cp-card__title')?.textContent ?? '';
+        banner.querySelector('[data-cp-continue-meta]')!.textContent = `${done} of ${total} steps done`;
+        banner.hidden = false;
+      } else banner.hidden = true;
+    }
+  }
+
+  // Round filter
+  const filter = document.querySelector<HTMLElement>('[data-cp-round-filter]');
+  filter?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-round]');
+    if (!btn) return;
+    const round = btn.dataset.round as string;
+    filter.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+    document.querySelectorAll<HTMLElement>('.cp-os').forEach((card) => {
+      const inRound = round === 'all' || (card.dataset.rounds ?? '').split(' ').includes(round);
+      card.classList.toggle('is-dimmed', !inRound);
+    });
+  });
+
+  render();
+  onProgressChange(render);
+</script>
+
+<style>
+  .cp-home {
+    display: grid;
+    gap: 0;
+  }
+  .cp-home__section {
+    margin-top: 4rem;
+  }
+  .cp-home__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .cp-home__head .cp-section-sub {
+    margin-bottom: 0;
+    max-width: 40rem;
+  }
+  .cp-home__count {
+    margin: 0;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+
+  /* Continue banner */
+  .cp-continue {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.1rem 1rem;
+    align-items: center;
+    margin-top: 2rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--sl-color-accent);
+    border-radius: var(--cp-radius);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+  .cp-continue[hidden] {
+    display: none;
+  }
+  .cp-continue__label {
+    color: var(--sl-color-accent-high);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .cp-continue__title {
+    font-size: var(--sl-text-lg);
+    font-weight: 700;
+  }
+  .cp-continue__meta {
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+  .cp-continue__arrow {
+    grid-row: 1 / span 3;
+    grid-column: 2;
+    font-size: 1.5rem;
+  }
+
+  /* Stats */
+  .cp-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    margin: 2.5rem 0 0;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-border);
+    overflow: hidden;
+  }
+  @media (min-width: 45rem) {
+    .cp-stats {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  .cp-stats > div {
+    display: flex;
+    flex-direction: column-reverse;
+    padding: 1rem 1.25rem;
+    background: var(--cp-card);
+  }
+  .cp-stats dt {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+  .cp-stats dd {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  /* Learning path */
+  .cp-path {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+    counter-reset: none;
+  }
+  .cp-path__item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    height: 100%;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+    color: var(--sl-color-white);
+    text-decoration: none;
+    transition:
+      border-color 0.15s,
+      background-color 0.15s;
+  }
+  .cp-path__item:hover {
+    border-color: var(--sl-color-accent);
+    background: var(--cp-card-hover);
+  }
+  .cp-path__item.is-next {
+    border-color: var(--sl-color-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-color-accent) 18%, transparent);
+  }
+  .cp-path__n {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+    font-weight: 800;
+  }
+  .cp-path__check,
+  .cp-path__read {
+    display: none;
+  }
+  .is-read .cp-path__n {
+    background: var(--cp-success);
+    color: var(--sl-color-black);
+  }
+  .is-read .cp-path__num {
+    display: none;
+  }
+  .is-read .cp-path__check,
+  .is-read .cp-path__read {
+    display: inline;
+  }
+  .cp-path__body {
+    display: grid;
+    gap: 0.1rem;
+  }
+  .cp-path__title {
+    font-weight: 650;
+    line-height: 1.3;
+  }
+  .cp-path__meta {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+
+  /* OS cards */
+  .cp-os {
+    overflow: hidden;
+  }
+  .cp-os::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 4px;
+    background: var(--os, var(--sl-color-accent));
+  }
+  .cp-os--windows {
+    --os: var(--cp-os-windows);
+  }
+  .cp-os--server {
+    --os: var(--cp-os-server);
+  }
+  .cp-os--mint {
+    --os: var(--cp-os-mint);
+  }
+  .cp-os--debian {
+    --os: var(--cp-os-debian);
+  }
+  .cp-os--freebsd {
+    --os: var(--cp-os-freebsd);
+  }
+  .cp-os--ubuntu {
+    --os: var(--cp-os-ubuntu);
+  }
+  .cp-os.is-dimmed {
+    opacity: 0.35;
+    filter: grayscale(0.6);
+  }
+  .cp-os__top {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+  .cp-os__mark {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.75rem;
+    background: color-mix(in srgb, var(--os) 18%, transparent);
+    color: var(--os);
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  :root[data-theme='dark'] .cp-os__mark {
+    color: color-mix(in srgb, var(--os) 60%, white);
+  }
+  .cp-os__image {
+    margin: 0.1rem 0 0;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .cp-os__rounds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .cp-os__progress {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: auto;
+    padding-top: 0.5rem;
+  }
+  .cp-os__progress .cp-bar {
+    flex: 1;
+  }
+  .cp-os__count {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* Timeline */
+  .cp-timeline {
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  }
+  .cp-timeline__item {
+    position: relative;
+    padding: 1rem 1.1rem 1.1rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .cp-timeline__dates {
+    margin: 0;
+    color: var(--sl-color-accent);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .cp-timeline__name {
+    margin: 0.2rem 0 0.75rem;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-lg);
+    font-weight: 750;
+  }
+  .cp-timeline__images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .cp-chip {
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 0.45rem;
+    color: var(--sl-color-gray-1);
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .cp-chip:hover {
+    border-color: var(--sl-color-accent);
+    color: var(--sl-color-white);
+  }
+
+  /* Tools */
+  .cp-tool__icon {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.75rem;
+    background: var(--sl-color-accent-low);
+    font-size: 1.35rem;
+  }
+
+  /* Rules */
+  .cp-rules {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  }
+  .cp-rule {
+    padding: 1.1rem 1.15rem;
+    border-top: 3px solid var(--sl-color-accent);
+    border-radius: 0 0 var(--cp-radius) var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .cp-rule__n {
+    color: var(--sl-color-accent);
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-sm);
+    font-weight: 700;
+  }
+  .cp-rule__title {
+    margin: 0.3rem 0 0.35rem;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-base);
+    font-weight: 700;
+  }
+  .cp-rule__text {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+
+  .cp-home__legal {
+    margin: 4rem 0 0;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--cp-border);
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+</style>

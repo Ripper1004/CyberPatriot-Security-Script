@@ -1,0 +1,349 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { CATEGORIES, COMMANDS } from '../../data/commands';
+
+const osLabel = { linux: 'Linux', windows: 'Windows', freebsd: 'FreeBSD' } as const;
+const shell = { linux: 'Terminal', windows: 'PowerShell (Admin)', freebsd: 'Terminal (root)' } as const;
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Command finder',
+    description: 'Search the most useful Linux, Windows and FreeBSD security commands by what you want to do.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="cf not-content" data-cf>
+    <div class="cf__bar">
+      <div class="cf__search">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"
+          ><path
+            fill="currentColor"
+            d="M21.7 20.3 17 15.6A8 8 0 1 0 15.6 17l4.7 4.7a1 1 0 0 0 1.4-1.4ZM4 10a6 6 0 1 1 6 6 6 6 0 0 1-6-6Z"
+          ></path></svg
+        >
+        <label for="cf-q" class="cp-visually-hidden">Search commands</label>
+        <input
+          id="cf-q"
+          class="cp-input"
+          type="search"
+          placeholder="What do you want to do? e.g. “firewall”, “delete user”, “hash”"
+          autocomplete="off"
+          spellcheck="false"
+          data-cf-q
+        />
+        <kbd class="cf__kbd" aria-hidden="true">/</kbd>
+      </div>
+      <div class="cp-segmented" role="group" aria-label="Operating system" data-cf-os>
+        <button type="button" data-os="all" aria-pressed="true">All</button>
+        <button type="button" data-os="linux" aria-pressed="false">Linux</button>
+        <button type="button" data-os="windows" aria-pressed="false">Windows</button>
+        <button type="button" data-os="freebsd" aria-pressed="false">FreeBSD</button>
+      </div>
+    </div>
+    <div class="cf__cats" role="group" aria-label="Category" data-cf-cats>
+      <button type="button" class="cf__cat" data-cat="all" aria-pressed="true">All topics</button>
+      {
+        CATEGORIES.map((c) => (
+          <button type="button" class="cf__cat" data-cat={c} aria-pressed="false">
+            {c}
+          </button>
+        ))
+      }
+    </div>
+    <p class="cf__count" role="status" data-cf-count>{COMMANDS.length} commands</p>
+
+    <ul class="cf__list" data-cf-list>
+      {
+        COMMANDS.map((c) => (
+          <li class="cf__item" data-os={c.os} data-cat={c.cat} data-text={`${c.task} ${c.cmd} ${c.note ?? ''} ${c.cat}`.toLowerCase()}>
+            <div class="cf__head">
+              <p class="cf__task">{c.task}</p>
+              <div class="cf__tags">
+                {c.risk && (
+                  <span class="cp-pill cp-pill--warn" title="This changes the computer. Check the README first.">
+                    Changes things
+                  </span>
+                )}
+                <span class={`cf__os cf__os--${c.os}`}>{osLabel[c.os]}</span>
+              </div>
+            </div>
+            <div class="cf__cmd">
+              <span class="cf__shell">{shell[c.os]}</span>
+              <code>{c.cmd}</code>
+              <button type="button" class="cp-btn cp-btn--sm cf__copy" data-copy={c.cmd} aria-label={`Copy: ${c.task}`}>
+                Copy
+              </button>
+            </div>
+            {c.note && <p class="cf__note">{c.note}</p>}
+          </li>
+        ))
+      }
+    </ul>
+    <div class="cf__empty" data-cf-empty hidden>
+      <p><strong>No commands match.</strong> Try a simpler word, or pick “All”.</p>
+    </div>
+    <p class="cp-hint cf__foot">
+      Commands use example names like <code>alice</code>, <code>bob</code> and <code>mallory</code>. Replace them with
+      names from your README. Each checklist explains these commands step by step.
+    </p>
+  </div>
+</StarlightPage>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-cf]')!;
+  const q = root.querySelector<HTMLInputElement>('[data-cf-q]')!;
+  const osGroup = root.querySelector<HTMLElement>('[data-cf-os]')!;
+  const catGroup = root.querySelector<HTMLElement>('[data-cf-cats]')!;
+  const items = [...root.querySelectorAll<HTMLElement>('.cf__item')];
+  const count = root.querySelector<HTMLElement>('[data-cf-count]')!;
+  const empty = root.querySelector<HTMLElement>('[data-cf-empty]')!;
+
+  const params = new URLSearchParams(location.search);
+  let os = params.get('os') ?? 'all';
+  let cat = params.get('cat') ?? 'all';
+  q.value = params.get('q') ?? '';
+
+  // Synonyms so beginners find things with their own words
+  const SYN: Record<string, string> = {
+    remove: 'delete',
+    erase: 'delete',
+    account: 'user',
+    accounts: 'user',
+    admin: 'admin administrator sudo wheel',
+    port: 'port listen',
+    virus: 'defender scan',
+    malware: 'defender backdoor',
+    password: 'password',
+    install: 'install update',
+    program: 'program package software',
+    app: 'program package software',
+    log: 'log login',
+  };
+
+  function apply() {
+    const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
+    let shown = 0;
+    for (const item of items) {
+      const text = item.dataset.text ?? '';
+      const okOs = os === 'all' || item.dataset.os === os;
+      const okCat = cat === 'all' || item.dataset.cat === cat;
+      const okText = words.every((w) => text.includes(w) || (SYN[w] ?? '').split(' ').some((s) => s && text.includes(s)));
+      const show = okOs && okCat && okText;
+      item.hidden = !show;
+      if (show) shown++;
+    }
+    count.textContent = `${shown} command${shown === 1 ? '' : 's'}`;
+    empty.hidden = shown > 0;
+    osGroup.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.os === os)));
+    catGroup.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cat === cat)));
+    const p = new URLSearchParams();
+    if (q.value) p.set('q', q.value);
+    if (os !== 'all') p.set('os', os);
+    if (cat !== 'all') p.set('cat', cat);
+    history.replaceState(null, '', `${location.pathname}${p.size ? `?${p}` : ''}`);
+  }
+
+  q.addEventListener('input', apply);
+  osGroup.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
+    if (b) {
+      os = b.dataset.os as string;
+      apply();
+    }
+  });
+  catGroup.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
+    if (b) {
+      cat = b.dataset.cat as string;
+      apply();
+    }
+  });
+  root.addEventListener('click', async (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-copy]');
+    if (!b) return;
+    try {
+      await navigator.clipboard.writeText(b.dataset.copy as string);
+      b.textContent = 'Copied ✓';
+      setTimeout(() => (b.textContent = 'Copy'), 1500);
+    } catch {
+      window.prompt('Copy this:', b.dataset.copy);
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement;
+    if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(t.tagName) && !t.isContentEditable && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      q.focus();
+    }
+  });
+  apply();
+</script>
+
+<style>
+  .cf__bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+  }
+  .cf__search {
+    position: relative;
+    flex: 1 1 22rem;
+    color: var(--sl-color-gray-3);
+  }
+  .cf__search svg {
+    position: absolute;
+    top: 50%;
+    left: 0.9rem;
+    transform: translateY(-50%);
+  }
+  .cf__search .cp-input {
+    min-height: 3rem;
+    padding-inline: 2.6rem 2.5rem;
+    border-radius: 999px;
+    font-size: var(--sl-text-base);
+  }
+  .cf__kbd {
+    position: absolute;
+    top: 50%;
+    right: 0.9rem;
+    transform: translateY(-50%);
+    padding: 0 0.4rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 0.3rem;
+    font-size: var(--sl-text-xs);
+  }
+  .cf__cats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 1rem;
+  }
+  .cf__cat {
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font: inherit;
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cf__cat:hover {
+    border-color: var(--sl-color-accent);
+  }
+  .cf__cat[aria-pressed='true'] {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+  }
+  .cf__count {
+    margin: 1.25rem 0 0.5rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+  .cf__list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .cf__item {
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .cf__item[hidden] {
+    display: none;
+  }
+  .cf__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.55rem;
+  }
+  .cf__task {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-weight: 650;
+  }
+  .cf__tags {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .cf__os {
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+  }
+  .cf__os--linux {
+    background: color-mix(in srgb, var(--cp-os-mint) 18%, transparent);
+    color: var(--cp-os-mint);
+  }
+  .cf__os--windows {
+    background: color-mix(in srgb, var(--cp-os-windows) 18%, transparent);
+    color: var(--cp-os-windows);
+  }
+  .cf__os--freebsd {
+    background: color-mix(in srgb, var(--cp-os-freebsd) 18%, transparent);
+    color: var(--cp-os-freebsd);
+  }
+  .cf__cmd {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0.45rem 0.45rem 0.75rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-black);
+  }
+  .cf__shell {
+    flex: none;
+    color: var(--sl-color-gray-3);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .cf__cmd code {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 0.2rem 0;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-xs);
+    white-space: pre;
+  }
+  @media (max-width: 40rem) {
+    .cf__shell {
+      display: none;
+    }
+  }
+  .cf__copy {
+    flex: none;
+  }
+  .cf__note {
+    margin: 0.5rem 0 0;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .cf__empty {
+    padding: 2rem;
+    border: 1px dashed var(--cp-border);
+    border-radius: var(--cp-radius);
+    color: var(--sl-color-gray-2);
+    text-align: center;
+  }
+  .cf__foot {
+    margin-top: 1.5rem;
+  }
+</style>

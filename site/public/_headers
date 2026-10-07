@@ -1,0 +1,14 @@
+# Cloudflare Pages response headers
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  X-Robots-Tag: noindex
+
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/files/*
+  Cache-Control: no-cache
+  Content-Type: text/plain; charset=utf-8

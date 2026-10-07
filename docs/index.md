@@ -26,6 +26,7 @@ Step-by-step checklists, beginner guides and hardening scripts for practicing **
 - [Forensics questions](guides/forensics-questions.md): hashes, decoding, finding files, reading logs
 - [Linux critical service hardening](guides/linux-service-hardening.md): Apache, Nginx, PHP, MySQL, FTP, Samba, DNS, Postfix
 - [Glossary](guides/glossary.md): every acronym explained
+- [For mentors and teachers](guides/for-mentors-and-teachers.md): running practice sessions with this toolkit
 
 ## Scripts
 

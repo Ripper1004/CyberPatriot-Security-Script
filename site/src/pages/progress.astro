@@ -1,0 +1,458 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { CHECKLISTS, checklistSteps, lessons } from '../data/site';
+
+const lists = CHECKLISTS.map((c) => {
+  const data = checklistSteps[`checklists/${c.id}`];
+  // Group steps by section for the breakdown
+  const sections: { name: string; ids: string[] }[] = [];
+  for (const s of data.steps) {
+    const last = sections.at(-1);
+    if (last && last.name === s.section) last.ids.push(s.id);
+    else sections.push({ name: s.section, ids: [s.id] });
+  }
+  return { ...c, page: `checklists/${c.id}`, route: data.route, total: data.steps.length, sections };
+});
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'My progress',
+    description: 'Everything you have ticked off on this site: lessons, checklists and the quiz. Export it, import it, or reset it.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="pg not-content" data-pg>
+    <p class="pg__intro">
+      Your progress is saved <strong>in this browser only</strong>. It isn't uploaded anywhere, so it won't follow you to
+      another computer. Use <strong>Export</strong> to save it as a file (or hand it in), and <strong>Import</strong> to load
+      it somewhere else.
+    </p>
+    <p class="cp-callout cp-callout--warn" data-pg-nostorage hidden>
+      Your browser is blocking storage (private window or strict settings), so progress can't be saved here.
+    </p>
+
+    <div class="pg__summary">
+      <div class="pg__ring-card">
+        <svg class="pg__ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r="52" pathLength="100"></circle>
+          <circle class="pg__ring-fill" cx="60" cy="60" r="52" pathLength="100" data-pg-ring></circle>
+        </svg>
+        <div class="pg__ring-text">
+          <strong data-pg-overall>0%</strong>
+          <span>of all checklist steps</span>
+        </div>
+      </div>
+      <dl class="pg__stats">
+        <div><dt>Steps done</dt><dd data-pg-steps>0</dd></div>
+        <div><dt>Lessons read</dt><dd data-pg-lessons>0 / {lessons.length}</dd></div>
+        <div><dt>Best quiz score</dt><dd data-pg-quiz>–</dd></div>
+      </dl>
+    </div>
+
+    <section aria-labelledby="pg-lessons">
+      <h2 id="pg-lessons" class="pg__h">Lessons</h2>
+      <ol class="pg__lessons">
+        {
+          lessons.map((l) => (
+            <li data-pg-lesson={l.id}>
+              <span class="pg__dot" aria-hidden="true" />
+              <a href={l.route}>{l.label}</a>
+              <span class="pg__state" data-pg-lesson-state>
+                Not read
+              </span>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <section aria-labelledby="pg-lists">
+      <h2 id="pg-lists" class="pg__h">Checklists</h2>
+      <div class="pg__lists">
+        {
+          lists.map((c) => (
+            <details class="pg__list" data-pg-list={c.page} data-total={c.total}>
+              <summary>
+                <span class="pg__list-name">
+                  <a href={c.route}>{c.name}</a>
+                </span>
+                <span class="pg__list-count" data-pg-count>
+                  0 / {c.total}
+                </span>
+                <span class="cp-bar pg__list-bar">
+                  <span class="cp-bar__fill" style="width:0%" />
+                </span>
+              </summary>
+              <ul class="pg__sections">
+                {c.sections.map((s) => (
+                  <li data-ids={s.ids.join(' ')}>
+                    <span>{s.name}</span>
+                    <span class="pg__sec-count" data-pg-sec>
+                      0 / {s.ids.length}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <button type="button" class="cp-btn cp-btn--sm cp-btn--ghost cp-btn--danger" data-pg-reset-list={c.page}>
+                Reset this checklist
+              </button>
+            </details>
+          ))
+        }
+      </div>
+    </section>
+
+    <section aria-labelledby="pg-data" class="pg__data">
+      <h2 id="pg-data" class="pg__h">Save, move or reset</h2>
+      <div class="pg__name">
+        <label class="cp-label" for="pg-name">Your name (goes into the exported file)</label>
+        <input id="pg-name" class="cp-input" type="text" autocomplete="name" data-pg-name />
+      </div>
+      <div class="pg__buttons">
+        <button type="button" class="cp-btn cp-btn--primary" data-pg-export>Export my progress</button>
+        <label class="cp-btn">
+          Import a progress file
+          <input type="file" accept="application/json,.json" class="cp-visually-hidden" data-pg-import />
+        </label>
+        <button type="button" class="cp-btn cp-btn--danger" data-pg-reset>Reset everything</button>
+      </div>
+      <p class="pg__msg" role="status" data-pg-msg></p>
+    </section>
+  </div>
+</StarlightPage>
+
+<script>
+  import {
+    exportAll,
+    getDoneSteps,
+    getReadLessons,
+    getValue,
+    importAll,
+    onProgressChange,
+    resetAll,
+    resetSteps,
+    setValue,
+    storageAvailable,
+  } from '../scripts/store';
+
+  const root = document.querySelector<HTMLElement>('[data-pg]')!;
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const msg = (t: string) => ($('[data-pg-msg]').textContent = t);
+
+  function render() {
+    // Lessons
+    const read = getReadLessons();
+    let nRead = 0;
+    root.querySelectorAll<HTMLElement>('[data-pg-lesson]').forEach((li) => {
+      const isRead = read.has(li.dataset.pgLesson as string);
+      if (isRead) nRead++;
+      li.classList.toggle('is-done', isRead);
+      li.querySelector('[data-pg-lesson-state]')!.textContent = isRead ? 'Read ✓' : 'Not read';
+    });
+    $('[data-pg-lessons]').textContent = `${nRead} / ${root.querySelectorAll('[data-pg-lesson]').length}`;
+
+    // Checklists
+    let all = 0;
+    let allDone = 0;
+    root.querySelectorAll<HTMLElement>('[data-pg-list]').forEach((list) => {
+      const done = getDoneSteps(list.dataset.pgList as string);
+      const total = Number(list.dataset.total);
+      let n = 0;
+      list.querySelectorAll<HTMLElement>('.pg__sections li').forEach((li) => {
+        const ids = (li.dataset.ids ?? '').split(' ');
+        const k = ids.filter((id) => done.has(id)).length;
+        n += k;
+        li.querySelector('[data-pg-sec]')!.textContent = `${k} / ${ids.length}`;
+        li.classList.toggle('is-done', k === ids.length);
+      });
+      all += total;
+      allDone += n;
+      const pct = total ? Math.round((n / total) * 100) : 0;
+      list.querySelector('[data-pg-count]')!.textContent = `${n} / ${total}`;
+      list.querySelector<HTMLElement>('.cp-bar__fill')!.style.width = `${pct}%`;
+      list.querySelector('.cp-bar')!.classList.toggle('is-complete', pct === 100);
+    });
+    const overall = all ? Math.round((allDone / all) * 100) : 0;
+    $('[data-pg-overall]').textContent = `${overall}%`;
+    $('[data-pg-ring]').style.strokeDasharray = `${overall} 100`;
+    $('[data-pg-ring]').style.opacity = overall ? '1' : '0';
+    $('[data-pg-steps]').textContent = `${allDone} / ${all}`;
+    const plays = getValue<number>('quiz-plays', 0);
+    $('[data-pg-quiz]').textContent = plays ? `${getValue<number>('quiz-best', 0)} / 10` : '–';
+  }
+
+  $<HTMLInputElement>('[data-pg-name]').value = getValue<string>('name', '');
+  $('[data-pg-name]').addEventListener('change', (e) => setValue('name', (e.target as HTMLInputElement).value.trim()));
+
+  $('[data-pg-export]').addEventListener('click', () => {
+    const data = { app: 'cp-practice-toolkit', version: 1, exportedAt: new Date().toISOString(), progress: exportAll() };
+    const name = getValue<string>('name', '').replace(/[^a-z0-9-]+/gi, '-').replace(/^-|-$/g, '');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `cp-progress${name ? `-${name}` : ''}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    msg('Exported. The file is in your Downloads folder.');
+  });
+
+  $<HTMLInputElement>('[data-pg-import]').addEventListener('change', async (e) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (data?.app !== 'cp-practice-toolkit' || typeof data.progress !== 'object') throw new Error('not ours');
+      if (!confirm('Importing replaces matching progress on this browser. Continue?')) return;
+      const n = importAll(data.progress);
+      $<HTMLInputElement>('[data-pg-name]').value = getValue<string>('name', '');
+      msg(`Imported ${n} item${n === 1 ? '' : 's'}.`);
+    } catch {
+      msg('That file is not a progress file from this site.');
+    }
+  });
+
+  $('[data-pg-reset]').addEventListener('click', () => {
+    if (!confirm('Reset ALL progress on this site (lessons, checklists, quiz, timer)? This cannot be undone.')) return;
+    resetAll();
+    $<HTMLInputElement>('[data-pg-name]').value = '';
+    msg('Everything was reset.');
+  });
+  root.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-pg-reset-list]');
+    if (b && confirm('Clear the ticks on this checklist?')) resetSteps(b.dataset.pgResetList as string);
+  });
+
+  if (!storageAvailable()) $('[data-pg-nostorage]').hidden = false;
+  render();
+  onProgressChange(render);
+</script>
+
+<style>
+  .pg {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+  .pg__intro {
+    max-width: 48rem;
+    margin: 0;
+    color: var(--sl-color-gray-2);
+  }
+  .pg__summary {
+    display: grid;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  @media (min-width: 46rem) {
+    .pg__summary {
+      grid-template-columns: auto 1fr;
+    }
+  }
+  .pg__ring-card {
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 1.25rem 2rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .pg__ring {
+    width: 10rem;
+    height: 10rem;
+    transform: rotate(-90deg);
+  }
+  .pg__ring circle {
+    fill: none;
+    stroke: var(--sl-color-gray-5);
+    stroke-width: 9;
+  }
+  .pg__ring .pg__ring-fill {
+    stroke: var(--sl-color-accent);
+    stroke-dasharray: 0 100;
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.4s ease;
+  }
+  .pg__ring-text {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    max-width: 7rem;
+    text-align: center;
+  }
+  .pg__ring-text strong {
+    color: var(--sl-color-white);
+    font-size: 2rem;
+    font-weight: 800;
+  }
+  .pg__ring-text span {
+    color: var(--sl-color-gray-3);
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+  .pg__stats {
+    display: grid;
+    gap: 1px;
+    margin: 0;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-border);
+    overflow: hidden;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+  .pg__stats > div {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: center;
+    padding: 1rem 1.25rem;
+    background: var(--cp-card);
+  }
+  .pg__stats dt {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+  .pg__stats dd {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: 1.6rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .pg__h {
+    margin: 0 0 0.75rem;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-xl);
+  }
+  .pg__lessons {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pg__lessons li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--cp-card);
+  }
+  .pg__lessons a {
+    color: var(--sl-color-white);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .pg__lessons a:hover {
+    text-decoration: underline;
+  }
+  .pg__dot {
+    width: 0.7rem;
+    height: 0.7rem;
+    border: 2px solid var(--sl-color-gray-4);
+    border-radius: 50%;
+  }
+  .is-done .pg__dot {
+    border-color: var(--cp-success);
+    background: var(--cp-success);
+  }
+  .pg__state {
+    margin-inline-start: auto;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .is-done .pg__state {
+    color: var(--cp-success);
+    font-weight: 700;
+  }
+  .pg__lists {
+    display: grid;
+    gap: 0.6rem;
+  }
+  .pg__list {
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .pg__list summary {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem 1rem;
+    align-items: center;
+    padding: 0.9rem 1.1rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  .pg__list summary::-webkit-details-marker {
+    display: none;
+  }
+  .pg__list-name a {
+    color: var(--sl-color-white);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .pg__list-name a:hover {
+    text-decoration: underline;
+  }
+  .pg__list-count {
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+  .pg__list-bar {
+    grid-column: 1 / -1;
+  }
+  .pg__sections {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0 1.1rem;
+    padding: 0.5rem 0 0.75rem;
+    border-top: 1px solid var(--cp-border);
+    list-style: none;
+  }
+  .pg__sections li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+  .pg__sections li.is-done {
+    color: var(--cp-success);
+  }
+  .pg__sec-count {
+    font-variant-numeric: tabular-nums;
+  }
+  .pg__list > button {
+    margin: 0 1.1rem 1rem;
+  }
+  .pg__name {
+    display: grid;
+    gap: 0.35rem;
+    max-width: 22rem;
+    margin-bottom: 1rem;
+  }
+  .pg__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .pg__buttons label {
+    position: relative;
+  }
+  .pg__buttons label:focus-within {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+  .pg__msg {
+    min-height: 1.5rem;
+    margin: 0.75rem 0 0;
+    color: var(--cp-success);
+    font-size: var(--sl-text-sm);
+  }
+</style>

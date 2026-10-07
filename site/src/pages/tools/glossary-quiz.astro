@@ -1,0 +1,473 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import glossary from '../../data/generated/glossary.json';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Glossary quiz',
+    description: 'Flashcards and a quick multiple-choice quiz for the security words used in the checklists.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="gq not-content" data-gq data-terms={JSON.stringify(glossary)}>
+    <div class="gq__top">
+      <div class="cp-segmented" role="group" aria-label="Mode" data-gq-modes>
+        <button type="button" data-mode="quiz" aria-pressed="true">Quiz</button>
+        <button type="button" data-mode="cards" aria-pressed="false">Flashcards</button>
+      </div>
+      <p class="gq__best" data-gq-best></p>
+    </div>
+
+    <!-- Quiz -->
+    <section class="gq__panel" data-gq-quiz aria-live="polite">
+      <div class="gq__progress">
+        <span data-gq-qn>Question 1 of 10</span>
+        <span data-gq-score>Score: 0</span>
+      </div>
+      <div class="cp-bar"><span class="cp-bar__fill" data-gq-bar style="width:0%"></span></div>
+      <p class="gq__label">Which word means…</p>
+      <p class="gq__question" data-gq-question></p>
+      <div class="gq__options" data-gq-options></div>
+      <p class="gq__feedback" data-gq-feedback></p>
+      <div class="gq__actions">
+        <button type="button" class="cp-btn cp-btn--primary" data-gq-next hidden>Next question →</button>
+      </div>
+    </section>
+
+    <section class="gq__panel" data-gq-result hidden>
+      <p class="gq__label">Quiz finished</p>
+      <p class="gq__big" data-gq-final></p>
+      <p class="gq__msg" data-gq-msg></p>
+      <div data-gq-review></div>
+      <div class="gq__actions">
+        <button type="button" class="cp-btn cp-btn--primary" data-gq-restart>Try another 10</button>
+        <a class="cp-btn" href="/guides/glossary/">Read the glossary</a>
+      </div>
+    </section>
+
+    <!-- Flashcards -->
+    <section data-gq-cards hidden>
+      <button type="button" class="gq__card" data-gq-card aria-live="polite">
+        <span class="gq__card-side" data-gq-front></span>
+        <span class="gq__card-side gq__card-back" data-gq-back hidden></span>
+        <span class="gq__card-hint" data-gq-hint>Click or press Space to flip</span>
+      </button>
+      <div class="gq__card-nav">
+        <button type="button" class="cp-btn" data-gq-prev>← Previous</button>
+        <span class="gq__card-pos" data-gq-pos></span>
+        <button type="button" class="cp-btn" data-gq-next-card>Next →</button>
+      </div>
+      <div class="gq__actions gq__actions--center">
+        <button type="button" class="cp-btn cp-btn--sm cp-btn--ghost" data-gq-shuffle>Shuffle</button>
+        <button type="button" class="cp-btn cp-btn--sm cp-btn--ghost" data-gq-reverse aria-pressed="false">
+          Show meaning first
+        </button>
+      </div>
+    </section>
+  </div>
+</StarlightPage>
+
+<script>
+  import { getValue, setValue } from '../../scripts/store';
+
+  interface Term {
+    term: string;
+    meaning: string;
+  }
+  const root = document.querySelector<HTMLElement>('[data-gq]')!;
+  const TERMS: Term[] = JSON.parse(root.dataset.terms as string);
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const QUESTIONS = 10;
+
+  const shuffle = <T,>(a: T[]) => {
+    const b = [...a];
+    for (let i = b.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [b[i], b[j]] = [b[j], b[i]];
+    }
+    return b;
+  };
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+
+  /** Hide the answer if the meaning gives it away (e.g. "UFW: Uncomplicated Firewall"). */
+  function mask(t: Term) {
+    const parts = t.term
+      .split(/[/()]/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 1);
+    let m = t.meaning;
+    for (const p of parts) m = m.replace(new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\w*`, 'gi'), '____');
+    return m;
+  }
+
+  // ---------------- Quiz
+  let order: Term[] = [];
+  let qi = 0;
+  let score = 0;
+  let missed: { t: Term; picked: string }[] = [];
+
+  function startQuiz() {
+    order = shuffle(TERMS).slice(0, QUESTIONS);
+    qi = 0;
+    score = 0;
+    missed = [];
+    $('[data-gq-quiz]').hidden = false;
+    $('[data-gq-result]').hidden = true;
+    showQuestion();
+  }
+
+  function showQuestion() {
+    const t = order[qi];
+    const wrong = shuffle(TERMS.filter((x) => x.term !== t.term)).slice(0, 3);
+    const options = shuffle([t, ...wrong]);
+    $('[data-gq-qn]').textContent = `Question ${qi + 1} of ${order.length}`;
+    $('[data-gq-score]').textContent = `Score: ${score}`;
+    $('[data-gq-bar]').style.width = `${(qi / order.length) * 100}%`;
+    $('[data-gq-question]').textContent = mask(t);
+    $('[data-gq-feedback]').textContent = '';
+    $('[data-gq-feedback]').className = 'gq__feedback';
+    $('[data-gq-next]').hidden = true;
+    $('[data-gq-options]').innerHTML = options
+      .map((o, i) => `<button type="button" class="gq__opt" data-term="${esc(o.term)}"><kbd>${i + 1}</kbd> ${esc(o.term)}</button>`)
+      .join('');
+  }
+
+  function answer(btn: HTMLButtonElement) {
+    const t = order[qi];
+    const opts = [...root.querySelectorAll<HTMLButtonElement>('.gq__opt')];
+    if (opts.some((o) => o.disabled)) return;
+    const ok = btn.dataset.term === t.term;
+    opts.forEach((o) => {
+      o.disabled = true;
+      if (o.dataset.term === t.term) o.classList.add('is-right');
+    });
+    const fb = $('[data-gq-feedback]');
+    if (ok) {
+      score++;
+      fb.textContent = 'Correct!';
+      fb.className = 'gq__feedback is-right';
+    } else {
+      btn.classList.add('is-wrong');
+      missed.push({ t, picked: btn.dataset.term as string });
+      fb.textContent = `Not quite. It’s “${t.term}”: ${t.meaning}`;
+      fb.className = 'gq__feedback is-wrong';
+    }
+    $('[data-gq-score]').textContent = `Score: ${score}`;
+    const next = $<HTMLButtonElement>('[data-gq-next]');
+    next.textContent = qi + 1 < order.length ? 'Next question →' : 'See my score →';
+    next.hidden = false;
+    next.focus();
+  }
+
+  function finish() {
+    $('[data-gq-quiz]').hidden = true;
+    $('[data-gq-result]').hidden = false;
+    $('[data-gq-final]').textContent = `${score} / ${order.length}`;
+    $('[data-gq-msg]').textContent =
+      score === order.length
+        ? 'Perfect score! You know your stuff.'
+        : score >= order.length * 0.7
+          ? 'Nice work. Review the ones you missed below.'
+          : 'Keep practising. Flashcards help: switch to them at the top.';
+    $('[data-gq-review]').innerHTML = missed.length
+      ? `<p class="gq__label">Review</p><ul class="gq__review">${missed
+          .map((m) => `<li><strong>${esc(m.t.term)}</strong>: ${esc(m.t.meaning)}</li>`)
+          .join('')}</ul>`
+      : '';
+    const best = getValue<number>('quiz-best', 0);
+    if (score > best) setValue('quiz-best', score);
+    setValue('quiz-plays', getValue<number>('quiz-plays', 0) + 1);
+    renderBest();
+  }
+
+  function renderBest() {
+    const best = getValue<number>('quiz-best', 0);
+    const plays = getValue<number>('quiz-plays', 0);
+    $('[data-gq-best]').textContent = plays ? `Best score: ${best} / ${QUESTIONS} · ${plays} quiz${plays === 1 ? '' : 'zes'} taken` : '';
+  }
+
+  $('[data-gq-options]').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('.gq__opt');
+    if (b) answer(b);
+  });
+  $('[data-gq-next]').addEventListener('click', () => {
+    qi++;
+    if (qi < order.length) showQuestion();
+    else finish();
+  });
+  $('[data-gq-restart]').addEventListener('click', startQuiz);
+
+  // ---------------- Flashcards
+  let deck = [...TERMS];
+  let ci = 0;
+  let flipped = false;
+  let reverse = false;
+
+  function showCard() {
+    const t = deck[ci];
+    const front = reverse ? t.meaning : t.term;
+    const back = reverse ? t.term : t.meaning;
+    $('[data-gq-front]').textContent = front;
+    $('[data-gq-back]').textContent = back;
+    $('[data-gq-front]').hidden = flipped;
+    $('[data-gq-back]').hidden = !flipped;
+    $('[data-gq-card]').classList.toggle('is-flipped', flipped);
+    $('[data-gq-card]').classList.toggle('is-long', front.length > 60 && !flipped);
+    $('[data-gq-hint]').textContent = flipped ? 'Click or press Space to flip back' : 'Click or press Space to flip';
+    $('[data-gq-pos]').textContent = `Card ${ci + 1} of ${deck.length}`;
+  }
+  const move = (d: number) => {
+    ci = (ci + d + deck.length) % deck.length;
+    flipped = false;
+    showCard();
+  };
+  $('[data-gq-card]').addEventListener('click', () => {
+    flipped = !flipped;
+    showCard();
+  });
+  $('[data-gq-prev]').addEventListener('click', () => move(-1));
+  $('[data-gq-next-card]').addEventListener('click', () => move(1));
+  $('[data-gq-shuffle]').addEventListener('click', () => {
+    deck = shuffle(TERMS);
+    ci = 0;
+    flipped = false;
+    showCard();
+  });
+  $('[data-gq-reverse]').addEventListener('click', (e) => {
+    reverse = !reverse;
+    (e.currentTarget as HTMLElement).setAttribute('aria-pressed', String(reverse));
+    flipped = false;
+    showCard();
+  });
+
+  // ---------------- Modes + keyboard
+  let mode = 'quiz';
+  $('[data-gq-modes]').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-mode]');
+    if (!b) return;
+    mode = b.dataset.mode as string;
+    root.querySelectorAll('[data-gq-modes] button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    const quizDone = !$('[data-gq-result]').hidden;
+    $('[data-gq-quiz]').hidden = mode !== 'quiz' || quizDone;
+    $('[data-gq-result]').hidden = mode !== 'quiz' || !quizDone;
+    $('[data-gq-cards]').hidden = mode !== 'cards';
+  });
+  document.addEventListener('keydown', (e) => {
+    if ((e.target as HTMLElement).closest('input, textarea, select') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (mode === 'quiz' && !$('[data-gq-quiz]').hidden) {
+      const n = Number(e.key);
+      const opts = root.querySelectorAll<HTMLButtonElement>('.gq__opt');
+      if (n >= 1 && n <= opts.length) opts[n - 1].click();
+      else if (e.key === 'Enter' && !$('[data-gq-next]').hidden && document.activeElement !== $('[data-gq-next]')) $('[data-gq-next]').click();
+    } else if (mode === 'cards') {
+      if (e.key === 'ArrowRight') move(1);
+      else if (e.key === 'ArrowLeft') move(-1);
+      else if (e.key === ' ' && document.activeElement !== $('[data-gq-card]')) {
+        e.preventDefault();
+        $('[data-gq-card]').click();
+      }
+    }
+  });
+
+  renderBest();
+  startQuiz();
+  showCard();
+</script>
+
+<style>
+  .gq {
+    max-width: 46rem;
+  }
+  .gq__top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .gq__best {
+    margin: 0;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+  .gq__panel {
+    padding: 1.5rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 1.1rem;
+    background: var(--cp-card);
+    box-shadow: var(--cp-shadow);
+  }
+  .gq__progress {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+  .gq__label {
+    margin: 1.5rem 0 0.35rem;
+    color: var(--sl-color-accent);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .gq__question {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: clamp(1.15rem, 2.6vw, 1.45rem);
+    font-weight: 650;
+    line-height: 1.45;
+  }
+  .gq__options {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 1.25rem;
+  }
+  @media (min-width: 40rem) {
+    .gq__options {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .gq__options :global(.gq__opt) {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 3.25rem;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-black);
+    color: var(--sl-color-white);
+    font: inherit;
+    font-weight: 600;
+    text-align: start;
+    cursor: pointer;
+  }
+  .gq__options :global(.gq__opt:hover:not(:disabled)) {
+    border-color: var(--sl-color-accent);
+  }
+  .gq__options :global(.gq__opt kbd) {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 0.35rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .gq__options :global(.gq__opt:disabled) {
+    cursor: default;
+    opacity: 0.6;
+  }
+  .gq__options :global(.gq__opt.is-right) {
+    border-color: var(--cp-success);
+    background: var(--cp-success-low);
+    opacity: 1;
+  }
+  .gq__options :global(.gq__opt.is-wrong) {
+    border-color: var(--cp-danger);
+    background: var(--cp-danger-low);
+    opacity: 1;
+  }
+  .gq__feedback {
+    min-height: 1.5rem;
+    margin: 1rem 0 0;
+    font-size: var(--sl-text-sm);
+  }
+  .gq__feedback.is-right {
+    color: var(--cp-success);
+    font-weight: 700;
+  }
+  .gq__feedback.is-wrong {
+    color: var(--sl-color-gray-1);
+  }
+  .gq__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+  .gq__actions--center {
+    justify-content: center;
+  }
+  .gq__big {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: 3.5rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+  .gq__msg {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+  }
+  .gq__panel :global(.gq__review) {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding-inline-start: 1.1rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+  .gq__card {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-height: 17rem;
+    padding: 2.5rem 2rem 3rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 1.25rem;
+    background: var(--cp-card);
+    box-shadow: var(--cp-shadow);
+    color: var(--sl-color-white);
+    font: inherit;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .gq__card:hover {
+    border-color: var(--sl-color-accent);
+  }
+  .gq__card.is-flipped {
+    background: var(--sl-color-accent-low);
+  }
+  .gq__card-side {
+    font-size: clamp(1.6rem, 5vw, 2.5rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    text-align: center;
+  }
+  .gq__card.is-long .gq__card-side,
+  .gq__card-back {
+    font-size: clamp(1.05rem, 2.5vw, 1.35rem);
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.5;
+  }
+  .gq__card-hint {
+    position: absolute;
+    bottom: 0.9rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .gq__card-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .gq__card-pos {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

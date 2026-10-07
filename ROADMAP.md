@@ -197,43 +197,75 @@ The checklists are for **people who have never done this before**. Every OS gets
 - **Using the scripts safely.**
 - **Glossary:** every acronym (PAM, UAC, SMB, LLMNR and so on) explained in one or two sentences.
 
-### Formatting choices (so they work on GitHub *and* the future website)
-- Warnings use GitHub alert syntax (`> [!WARNING]`). It renders nicely on GitHub today and on the website later.
-- Checkboxes use `- [ ]`, so they're clickable on the website.
+### Formatting choices (so they work on GitHub *and* the website)
+- Warnings use GitHub alert syntax (`> [!WARNING]`). It renders on GitHub, and the website turns it into a coloured box.
+- Each step has a `- [ ] Done` line under its `###` heading. The website turns it into a "Mark this step done" button that remembers progress.
 - No tabs or other site-only features, so everything still reads well on GitHub.
 
 ---
 
-## 5. Website plan (later phase)
+## 5. Website (built: `site/`)
 
-**Goal:** teammates open a normal web link and get a clean, searchable site. They never need to understand GitHub.
+**Goal:** students open a normal web link and get a clean, searchable site. They never need to understand GitHub.
 
-**Recommended approach: MkDocs Material, published by GitHub Pages**
-- The site is generated from the `docs/` folder already in this repo, so the checklists live in one place.
-- A GitHub Action rebuilds the site automatically every time something is merged into `main`. Nobody has to "deploy" anything.
-- Free hosting at `https://ripper1004.github.io/CyberPatriot-Security-Script/`. Free GitHub Pages requires the repo to stay public.
-- Features:
-  - search box
-  - dark mode
-  - left-side navigation by OS
-  - copy buttons on every command
-  - printable pages
-  - warning boxes
-- Extra beginner features to add:
-  - **progress-saving checkboxes:** checked items are remembered in your browser, with a "reset" button for a new practice image
-  - **"Start here" landing page** with big buttons per OS
-  - **printable one-page cheat sheets** per OS
+**What was built:** an [Astro](https://astro.build/) + [Starlight](https://starlight.astro.build/) site in [`site/`](site/), hosted on **Cloudflare Pages**. Setup steps are in [`site/README.md`](site/README.md).
 
-**Alternatives considered:**
-- **Google Sites:** easy to edit, but it would mean keeping two copies of everything in sync.
-- **Notion:** same problem.
-- **A custom React app:** more work to maintain and no real benefit for documentation.
+**Why Cloudflare Pages and not GitHub Pages:**
+- Free GitHub Pages needs a public repo. Cloudflare Pages also works with a **private** repo, which matters if the school competes again (rule 3011.5).
+- Cloudflare Access (free for small groups) can put a login in front of the site so only the class can open it.
+- It rebuilds automatically on every merge into `main`, and builds a preview link for every pull request.
 
-**Steps when we get there:**
-1. Add `mkdocs.yml` and a `requirements.txt`.
-2. Add `.github/workflows/pages.yml`.
-3. Turn on Pages in repo Settings → Pages → Source: GitHub Actions.
-4. Add the checkbox-progress script and the landing page.
+**How it stays in sync:** `docs/` is still the single source. At build time `site/scripts/sync-docs.mjs` copies the Markdown into the site and converts it:
+- `# Title` → page title
+- GitHub alerts (`> [!WARNING]`) → coloured boxes
+- links between `.md` files → site links (links to other repo files go to GitHub)
+- `- [ ] Done` items → interactive steps
+
+So the checklists still read well on GitHub, and editing `docs/` updates the website.
+
+**Features:**
+- **Interactive checklists:**
+  - "Mark this step done" on every step, saved in the browser
+  - progress bar and per-section counters in the "On this page" list
+  - "Go to next step" and "Hide finished steps"
+  - "Reset for a new image"
+  - Print with tick boxes
+- **Learning path:** 7 lessons in order, with "Mark as read" and "Next lesson".
+- **Home page:**
+  - "continue where you left off"
+  - progress on every OS card
+  - round filter (Round 1 / 2 / State / Semifinals)
+  - season timeline, tools and golden rules
+- **README config builder:**
+  - paste the README and it finds the admins, users and critical services
+  - generates `my.conf` / `my-readme.psd1` and the exact commands to run
+  - catches common mistakes (a name in both lists, a weak password, you're not an admin)
+- **Round timer:**
+  - 30 min to 6 h, with the game-plan phases scaled to fit
+  - beeps and notifications at each phase
+  - survives a refresh
+  - full-screen projector mode
+- **Command finder:** 139 Linux / Windows / FreeBSD commands, with search, filters and one-click copy.
+- **Glossary quiz:** multiple choice and flashcards, built from `docs/guides/glossary.md`.
+- **Downloads:**
+  - every script with SHA-256 checksums
+  - copy-paste `wget` / `Invoke-WebRequest` / `fetch` commands that use the site's own address
+- **My progress:** everything in one place, with Export / Import (a JSON file a student can hand in) and Reset.
+- **Built-in:**
+  - full-text search (Pagefind)
+  - dark/light mode
+  - mobile layout
+  - copy buttons on code
+  - "Edit page" links to GitHub
+- **No accounts, no tracking:** progress lives in the browser's local storage. Search engines are asked not to index the site.
+
+**Checks:**
+- `npm run check`: TypeScript and Astro.
+- `npm test`: builds the site, then `scripts/verify-build.mjs` checks:
+  - every internal link and #anchor resolves
+  - every checklist step matches its heading
+  - every download matches its checksum
+- `.github/workflows/site.yml` runs both on every pull request that touches `docs/`, `scripts/` or `site/`.
 
 ---
 
@@ -245,7 +277,7 @@ The checklists are for **people who have never done this before**. Every OS gets
 4. ✅ Checklists and guides for all six OSes, plus beginner guides.
 5. ✅ FreeBSD script (shellcheck clean). **Still needs a real run on FreeBSD.**
 6. ✅ New README; the old scripts and checklists are removed (they stay in the git history).
-7. ⏳ *(Next)* Website.
+7. ✅ Website (`site/`, Astro + Starlight on Cloudflare Pages). **The repo owner connects it to Cloudflare once:** see [`site/README.md`](site/README.md).
 
 ## 7. Things the repo owner needs to do by hand
 - **Delete the 8 stale branches.** This session can't delete branches. Go to GitHub → the repo → **Branches** and click the 🗑️ next to:

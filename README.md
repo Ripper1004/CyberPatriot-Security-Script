@@ -2,7 +2,7 @@
 
 Beginner-friendly **checklists**, **guides** and **hardening scripts** for practicing CyberPatriot image challenges on Windows, Windows Server, Linux Mint, Debian, Ubuntu and FreeBSD.
 
-> **New to this?** Start at **[docs/index.md](docs/index.md)**. It walks you through everything in order.
+> **New to this?** Use the **website** (see [Website](#website) below), or start at **[docs/index.md](docs/index.md)** here on GitHub. Both walk you through everything in order.
 
 ---
 
@@ -24,6 +24,7 @@ Every item says **what** to do, **why** it matters, how to do it by **clicking**
 - [What is CyberPatriot?](docs/start-here/what-is-cyberpatriot.md) · [Reading the README](docs/start-here/reading-the-readme.md) · [Round game plan](docs/start-here/round-game-plan.md)
 - [Linux terminal basics](docs/start-here/linux-terminal-basics.md) · [PowerShell basics](docs/start-here/powershell-basics.md)
 - [Things that lose points](docs/guides/things-that-lose-points.md) · [Forensics questions](docs/guides/forensics-questions.md) · [Linux service hardening](docs/guides/linux-service-hardening.md) · [Glossary](docs/guides/glossary.md)
+- [For mentors and teachers](docs/guides/for-mentors-and-teachers.md): running practice sessions with this toolkit
 
 ### Scripts
 | Script | Works on |
@@ -49,6 +50,25 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\Harden.ps1
 
 ---
 
+## Website
+
+[`site/`](site/) turns everything above into a website for people who don't use GitHub. It's built with Astro + Starlight and hosted on Cloudflare Pages.
+
+- **Interactive checklists:** tick off steps, see your progress, jump to the next step, print, and reset for a new image.
+- **A 7-lesson learning path** for beginners.
+- **Tools:**
+  - README config builder: paste the README and get the script's config file
+  - round timer with game-plan phases
+  - command finder
+  - glossary quiz
+  - script downloads with checksums
+  - a progress page with export/import
+- **Search, dark mode, mobile layout.** No accounts and no tracking: progress is saved in the browser.
+
+The pages are generated from `docs/` at build time, so **edit `docs/` and the website updates itself**. Setup and local preview: [site/README.md](site/README.md).
+
+---
+
 ## How the scripts are tested
 
 | Script | Tests |
@@ -65,11 +85,12 @@ pwsh tests/windows/Test-HardenLogic.ps1       # needs PowerShell 7
 ---
 
 ## Plans
-See [ROADMAP.md](ROADMAP.md): what was wrong with the old scripts, the design of the new ones, and the plan for a **website** version of these checklists (MkDocs + GitHub Pages) so teammates never need to use GitHub.
+See [ROADMAP.md](ROADMAP.md): what was wrong with the old scripts, the design of the new ones, and how the website works.
 
 ## Contributing
 - Keep the checklist item format: **What · Why it matters · Clicking · Typing · Check it worked · Warning**.
 - Write for someone who has never done this before. Short sentences, explain every acronym.
+- Website changes: `cd site && npm install && npm test` (builds the site and checks every link). See [site/README.md](site/README.md).
 - Script changes: add a planted problem to `tests/linux/plant-vulns.sh` and a check to `tests/linux/verify.sh`, then run the tests.
 - Older versions of the scripts and checklists are in the git history.
 

@@ -1,0 +1,863 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'README config builder',
+    description:
+      'Turn the README’s list of admins, users and critical services into a config file for the hardening scripts, plus the exact commands to run.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="cb cp-wide not-content">
+    <p class="cb__intro">
+      Fill this in from the README on your practice image. You get a config file for the hardening script and the exact
+      commands to run it, so nobody has to type names into a terminal under time pressure. <strong
+        >Nothing you type leaves this page.</strong
+      >
+    </p>
+
+    <div class="cb__layout">
+      <form class="cb__form" data-cb-form autocomplete="off" onsubmit="return false">
+        <!-- 1. OS -->
+        <fieldset class="cb__card">
+          <legend class="cb__step"><span>1</span> Which computer?</legend>
+          <div class="cp-segmented" role="group" aria-label="Operating system" data-cb-os>
+            <button type="button" data-os="linux" aria-pressed="true">Linux</button>
+            <button type="button" data-os="windows" aria-pressed="false">Windows</button>
+            <button type="button" data-os="freebsd" aria-pressed="false">FreeBSD</button>
+          </div>
+          <p class="cp-hint cb__os-hint">Linux = Mint, Debian and Ubuntu. Windows = Windows 10, 11 and Server.</p>
+        </fieldset>
+
+        <!-- 2. Paste -->
+        <fieldset class="cb__card">
+          <legend class="cb__step"><span>2</span> Paste the README (optional, saves typing)</legend>
+          <div class="cp-field">
+            <label class="cp-label" for="cb-readme">README text</label>
+            <textarea
+              id="cb-readme"
+              class="cp-textarea"
+              rows="6"
+              placeholder={'Authorized Administrators:\nperry (you)\n    password: ...\ndmanning\n    password: ...\n\nAuthorized Users:\ncpetersen\nmstone\n\nCritical services: OpenSSH Server, Apache'}
+              data-cb-readme></textarea>
+            <p class="cp-hint">
+              Copy the user list (and the critical services, if any) from the README and paste it here. Passwords are
+              ignored.
+            </p>
+          </div>
+          <div class="cb__row">
+            <button type="button" class="cp-btn cp-btn--primary cp-btn--sm" data-cb-parse>Read the names for me</button>
+            <span class="cb__parse-result" role="status" data-cb-parse-result></span>
+          </div>
+        </fieldset>
+
+        <!-- 3. People -->
+        <fieldset class="cb__card">
+          <legend class="cb__step"><span>3</span> Authorized people</legend>
+          <div class="cp-field">
+            <label class="cp-label" for="cb-admins">Authorized administrators</label>
+            <input id="cb-admins" class="cp-input" type="text" spellcheck="false" placeholder="perry dmanning" data-cb-admins />
+            <p class="cp-hint">Separate names with spaces or commas. They keep (or get) admin rights.</p>
+            <div class="cb__chips" data-cb-chips="admins"></div>
+          </div>
+          <div class="cp-field">
+            <label class="cp-label" for="cb-users">Other authorized users (not admins)</label>
+            <textarea
+              id="cb-users"
+              class="cp-textarea cb__users"
+              rows="3"
+              spellcheck="false"
+              placeholder="cpetersen mstone jlee"
+              data-cb-users></textarea>
+            <p class="cp-hint">
+              Everyone else in the README. The script flags any account <em>not</em> listed here or above.
+            </p>
+            <div class="cb__chips" data-cb-chips="users"></div>
+          </div>
+          <div class="cp-field">
+            <label class="cp-label" for="cb-me">Your username on the image (optional)</label>
+            <input id="cb-me" class="cp-input" type="text" spellcheck="false" placeholder="perry" data-cb-me />
+            <p class="cp-hint">The account you're logged in as, usually marked “(you)” in the README. Only used for checks below.</p>
+          </div>
+        </fieldset>
+
+        <!-- 4. Services -->
+        <fieldset class="cb__card">
+          <legend class="cb__step"><span>4</span> Critical services</legend>
+          <p class="cp-hint cb__lead">
+            Tick only what the README says must keep working. These are never stopped, removed or firewalled.
+          </p>
+          <div class="cb__services" data-cb-services></div>
+        </fieldset>
+
+        <!-- 5. Options -->
+        <fieldset class="cb__card">
+          <legend class="cb__step"><span>5</span> Options</legend>
+          <div class="cp-field">
+            <label class="cp-label" for="cb-pass-mode">New password for the other users</label>
+            <select id="cb-pass-mode" class="cp-select" data-cb-pass-mode>
+              <option value="set">Set this password</option>
+              <option value="ask">Ask me when the script runs</option>
+              <option value="skip">Don't change passwords</option>
+            </select>
+            <div class="cb__pass" data-cb-pass-wrap>
+              <input
+                id="cb-pass"
+                class="cp-input"
+                type="text"
+                spellcheck="false"
+                aria-label="New password"
+                data-cb-pass
+              />
+              <button type="button" class="cp-btn cp-btn--sm" data-cb-generate>Generate</button>
+            </div>
+            <div class="cb__strength" data-cb-strength aria-live="polite"></div>
+            <p class="cp-hint">Given to every authorized user except you. 12+ characters with upper, lower, number and symbol.</p>
+          </div>
+          <div class="cp-field" data-cb-only="linux windows">
+            <label class="cp-label" for="cb-lockout">Account lockout after 5 wrong passwords</label>
+            <select id="cb-lockout" class="cp-select" data-cb-lockout>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+              <option value="ask" data-cb-only="linux">Ask me</option>
+            </select>
+          </div>
+          <div class="cp-field">
+            <label class="cp-label" for="cb-updates">Install all updates during the run (slow)</label>
+            <select id="cb-updates" class="cp-select" data-cb-updates>
+              <option value="ask">Ask me</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="cp-field" data-cb-only="linux">
+            <label class="cp-label" for="cb-sshpw">SSH password logins</label>
+            <select id="cb-sshpw" class="cp-select" data-cb-sshpw>
+              <option value="keep">Keep as they are (recommended)</option>
+              <option value="yes">Allow</option>
+              <option value="no">Block (only if the README says so)</option>
+            </select>
+          </div>
+          <div class="cp-field" data-cb-only="linux freebsd">
+            <label class="cp-label" for="cb-ports">Extra firewall ports to open</label>
+            <input id="cb-ports" class="cp-input" type="text" spellcheck="false" placeholder="8080/tcp" data-cb-ports />
+            <p class="cp-hint">Only if the README needs a port that isn't covered by a critical service above.</p>
+          </div>
+        </fieldset>
+        <button type="button" class="cp-btn cp-btn--ghost cp-btn--sm cb__clear" data-cb-clear>Clear the form</button>
+      </form>
+
+      <aside class="cb__out" aria-label="Your config file">
+        <div class="cb__out-inner">
+          <div class="cb__checks" data-cb-checks aria-live="polite"></div>
+
+          <div class="cb__file">
+            <div class="cb__file-head">
+              <span class="cb__file-name" data-cb-filename>my.conf</span>
+              <div class="cb__file-actions">
+                <button type="button" class="cp-btn cp-btn--sm" data-cb-copy>Copy</button>
+                <button type="button" class="cp-btn cp-btn--primary cp-btn--sm" data-cb-download>Download</button>
+              </div>
+            </div>
+            <pre class="cb__code" data-cb-output></pre>
+          </div>
+
+          <h2 class="cb__h">Then run it</h2>
+          <ol class="cb__run" data-cb-run></ol>
+          <p class="cp-hint">
+            New to this? Read <a href="/start-here/using-the-scripts/">Using the scripts safely</a> first. Get the scripts
+            from the <a href="/downloads/">downloads page</a>.
+          </p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</StarlightPage>
+
+<script>
+  import { getValue, setValue } from '../../scripts/store';
+
+  type OS = 'linux' | 'windows' | 'freebsd';
+
+  // Keywords each script understands (see scripts/*/config.example.*)
+  const SERVICES: Record<OS, [string, string][]> = {
+    linux: [
+      ['ssh', 'SSH (OpenSSH server)'],
+      ['apache', 'Apache web server'],
+      ['nginx', 'Nginx web server'],
+      ['php', 'PHP'],
+      ['mysql', 'MySQL'],
+      ['mariadb', 'MariaDB'],
+      ['postgresql', 'PostgreSQL'],
+      ['ftp', 'FTP (any)'],
+      ['vsftpd', 'vsftpd'],
+      ['proftpd', 'ProFTPD'],
+      ['pure-ftpd', 'Pure-FTPd'],
+      ['samba', 'Samba file sharing'],
+      ['dns', 'DNS (BIND)'],
+      ['mail', 'Mail (Postfix / Dovecot)'],
+      ['cups', 'Printing (CUPS)'],
+      ['nfs', 'NFS'],
+      ['snmp', 'SNMP'],
+      ['vnc', 'VNC'],
+      ['squid', 'Squid proxy'],
+      ['dhcp', 'DHCP server'],
+      ['ldap', 'LDAP'],
+      ['telnet', 'Telnet'],
+    ],
+    windows: [
+      ['rdp', 'Remote Desktop (RDP)'],
+      ['iis', 'IIS web server'],
+      ['ftp', 'FTP (IIS FTP)'],
+      ['smb', 'File sharing (SMB)'],
+      ['dns', 'DNS server'],
+      ['dhcp', 'DHCP server'],
+      ['ad', 'Active Directory'],
+      ['winrm', 'WinRM (remote PowerShell)'],
+      ['ssh', 'OpenSSH server'],
+      ['print', 'Print Spooler'],
+      ['sql', 'Microsoft SQL Server'],
+      ['mysql', 'MySQL'],
+      ['apache', 'Apache'],
+      ['snmp', 'SNMP'],
+      ['telnet', 'Telnet'],
+      ['vnc', 'VNC'],
+    ],
+    freebsd: [
+      ['ssh', 'SSH'],
+      ['apache', 'Apache'],
+      ['nginx', 'Nginx'],
+      ['mysql', 'MySQL / MariaDB'],
+      ['postgresql', 'PostgreSQL'],
+      ['ftp', 'FTP'],
+      ['samba', 'Samba'],
+      ['dns', 'DNS'],
+      ['mail', 'Mail (Postfix / Sendmail)'],
+      ['nfs', 'NFS'],
+    ],
+  };
+
+  // Words in a README's critical-services text -> keyword per OS
+  const DETECT: [RegExp, Partial<Record<OS, string>>][] = [
+    [/\b(open)?ssh|sshd\b/i, { linux: 'ssh', windows: 'ssh', freebsd: 'ssh' }],
+    [/apache|httpd/i, { linux: 'apache', windows: 'apache', freebsd: 'apache' }],
+    [/nginx/i, { linux: 'nginx', freebsd: 'nginx' }],
+    [/\bphp\b/i, { linux: 'php' }],
+    [/mariadb/i, { linux: 'mariadb', freebsd: 'mysql' }],
+    [/mysql/i, { linux: 'mysql', windows: 'mysql', freebsd: 'mysql' }],
+    [/postgres/i, { linux: 'postgresql', freebsd: 'postgresql' }],
+    [/vsftpd/i, { linux: 'vsftpd', freebsd: 'ftp' }],
+    [/proftpd/i, { linux: 'proftpd', freebsd: 'ftp' }],
+    [/pure-?ftpd/i, { linux: 'pure-ftpd', freebsd: 'ftp' }],
+    [/\bftp\b/i, { linux: 'ftp', windows: 'ftp', freebsd: 'ftp' }],
+    [/samba|\bsmb\b|file shar/i, { linux: 'samba', windows: 'smb', freebsd: 'samba' }],
+    [/\bdns\b|\bbind9?\b/i, { linux: 'dns', windows: 'dns', freebsd: 'dns' }],
+    [/postfix|dovecot|\bmail\b|smtp|sendmail/i, { linux: 'mail', freebsd: 'mail' }],
+    [/cups|print/i, { linux: 'cups', windows: 'print' }],
+    [/\bnfs\b/i, { linux: 'nfs', freebsd: 'nfs' }],
+    [/snmp/i, { linux: 'snmp', windows: 'snmp' }],
+    [/\bvnc\b/i, { linux: 'vnc', windows: 'vnc' }],
+    [/squid/i, { linux: 'squid' }],
+    [/dhcp/i, { linux: 'dhcp', windows: 'dhcp' }],
+    [/ldap/i, { linux: 'ldap' }],
+    [/telnet/i, { linux: 'telnet', windows: 'telnet' }],
+    [/remote desktop|\brdp\b/i, { windows: 'rdp' }],
+    [/\biis\b|internet information/i, { windows: 'iis' }],
+    [/active directory|domain controller|\bad ds\b/i, { windows: 'ad' }],
+    [/winrm/i, { windows: 'winrm' }],
+    [/sql server|mssql/i, { windows: 'sql' }],
+  ];
+
+  const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
+  const form = $<HTMLFormElement>('[data-cb-form]');
+  const el = {
+    os: $('[data-cb-os]'),
+    readme: $<HTMLTextAreaElement>('[data-cb-readme]'),
+    parseResult: $('[data-cb-parse-result]'),
+    admins: $<HTMLInputElement>('[data-cb-admins]'),
+    users: $<HTMLTextAreaElement>('[data-cb-users]'),
+    me: $<HTMLInputElement>('[data-cb-me]'),
+    services: $('[data-cb-services]'),
+    passMode: $<HTMLSelectElement>('[data-cb-pass-mode]'),
+    passWrap: $('[data-cb-pass-wrap]'),
+    pass: $<HTMLInputElement>('[data-cb-pass]'),
+    strength: $('[data-cb-strength]'),
+    lockout: $<HTMLSelectElement>('[data-cb-lockout]'),
+    updates: $<HTMLSelectElement>('[data-cb-updates]'),
+    sshpw: $<HTMLSelectElement>('[data-cb-sshpw]'),
+    ports: $<HTMLInputElement>('[data-cb-ports]'),
+    output: $('[data-cb-output]'),
+    filename: $('[data-cb-filename]'),
+    checks: $('[data-cb-checks]'),
+    run: $('[data-cb-run]'),
+  };
+
+  let os: OS = 'linux';
+  let selected = new Set<string>(['ssh']);
+
+  const splitNames = (s: string) =>
+    s
+      .split(/[\s,;]+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+  function renderServices() {
+    el.services.innerHTML = '';
+    for (const [key, label] of SERVICES[os]) {
+      const id = `cb-svc-${key}`;
+      const wrap = document.createElement('label');
+      wrap.className = 'cb__svc';
+      wrap.htmlFor = id;
+      wrap.innerHTML = `<input type="checkbox" id="${id}" value="${key}"><span>${label}</span><code>${key}</code>`;
+      const box = wrap.querySelector('input')!;
+      box.checked = selected.has(key);
+      box.addEventListener('change', () => {
+        if (box.checked) selected.add(key);
+        else selected.delete(key);
+        update();
+      });
+      el.services.append(wrap);
+    }
+  }
+
+  function setOS(next: OS) {
+    // Carry ticked services across where the same idea exists
+    const carried = new Set<string>();
+    for (const key of selected) {
+      const match = DETECT.find(([, map]) => map[os] === key);
+      const mapped = match?.[1][next] ?? (SERVICES[next].some(([k]) => k === key) ? key : undefined);
+      if (mapped) carried.add(mapped);
+    }
+    os = next;
+    selected = carried;
+    el.os.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.os === os)));
+    form.querySelectorAll<HTMLElement>('[data-cb-only]').forEach((n) => {
+      const show = (n.dataset.cbOnly ?? '').split(' ').includes(os);
+      if (n instanceof HTMLOptionElement) {
+        n.hidden = !show;
+        n.disabled = !show;
+      } else n.hidden = !show;
+    });
+    if (os === 'windows' && el.lockout.value === 'ask') el.lockout.value = 'yes';
+    renderServices();
+    update();
+  }
+
+  /** Reads names and critical services out of pasted README text. */
+  function parseReadme(text: string) {
+    const admins: string[] = [];
+    const users: string[] = [];
+    let me = '';
+    let mode: 'admins' | 'users' | 'services' | null = null;
+    let serviceText = '';
+    for (const raw of text.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (/authori[sz]ed\s+admin|^admin(istrator)?s?\s*:?$/i.test(line)) {
+        mode = 'admins';
+        continue;
+      }
+      if (/authori[sz]ed\s+users?|^(other\s+)?users?\s*:?$/i.test(line)) {
+        mode = 'users';
+        continue;
+      }
+      if (/critical\s+services?/i.test(line)) {
+        mode = 'services';
+        serviceText += ` ${line.replace(/.*critical\s+services?\s*:?/i, '')}`;
+        continue;
+      }
+      if (!line) {
+        if (mode === 'services' && serviceText.trim()) mode = null;
+        continue;
+      }
+      if (mode === 'services') {
+        serviceText += ` ${line}`;
+        continue;
+      }
+      if (mode !== 'admins' && mode !== 'users') continue;
+      if (/^password\s*:/i.test(line)) continue;
+      if (/:\s*$/.test(line) || line.split(/\s+/).length > 3) {
+        mode = null; // a new heading or a sentence ends the list
+        continue;
+      }
+      const name = line.match(/^[-*•]?\s*([a-z_][a-z0-9._-]*\$?)/i)?.[1];
+      if (!name) continue;
+      if (/\(you\)/i.test(line)) me = name;
+      const list = mode === 'admins' ? admins : users;
+      if (!list.includes(name)) list.push(name);
+    }
+    const services = new Set<string>();
+    for (const [re, map] of DETECT) if (re.test(serviceText) && map[os]) services.add(map[os] as string);
+    // Prefer the specific FTP server over generic "ftp" on Linux
+    if (os === 'linux' && ['vsftpd', 'proftpd', 'pure-ftpd'].some((k) => services.has(k))) services.delete('ftp');
+    return { admins, users: users.filter((u) => !admins.includes(u)), me, services };
+  }
+
+  function generatePassword() {
+    const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!@#%^*-_=+?'];
+    const all = sets.join('');
+    const pick = (s: string) => s[crypto.getRandomValues(new Uint32Array(1))[0] % s.length];
+    const chars = sets.map(pick);
+    while (chars.length < 16) chars.push(pick(all));
+    for (let i = chars.length - 1; i > 0; i--) {
+      const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+      [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+    return chars.join('');
+  }
+
+  function passwordIssues(p: string): string[] {
+    const issues: string[] = [];
+    if (p.length < 12) issues.push('at least 12 characters');
+    if (!/[A-Z]/.test(p)) issues.push('an uppercase letter');
+    if (!/[a-z]/.test(p)) issues.push('a lowercase letter');
+    if (!/[0-9]/.test(p)) issues.push('a number');
+    if (!/[^A-Za-z0-9]/.test(p)) issues.push('a symbol');
+    return issues;
+  }
+
+  const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
+
+  /** Quote a value for the Linux/FreeBSD config format. Returns null if impossible. */
+  function shQuote(v: string): string | null {
+    if (!v.includes('"')) return `"${v}"`;
+    if (!v.includes("'")) return `'${v}'`;
+    return null;
+  }
+  const psQuote = (v: string) => `'${v.replace(/'/g, "''")}'`;
+  const psList = (xs: string[]) => (xs.length ? `@(${xs.map(psQuote).join(', ')})` : '@()');
+
+  function buildFile(admins: string[], users: string[], services: string[], password: string) {
+    const ports = splitNames(el.ports.value).join(' ');
+    if (os === 'windows') {
+      return [
+        '# Made with the README config builder. Check every name!',
+        '@{',
+        `    AuthorizedAdmins = ${psList(admins)}`,
+        `    AuthorizedUsers  = ${psList(users)}`,
+        `    CriticalServices = ${psList(services)}`,
+        `    NewPassword      = ${psQuote(password)}`,
+        `    EnableLockout    = ${psQuote(el.lockout.value === 'no' ? 'no' : 'yes')}`,
+        `    InstallUpdates   = ${psQuote(el.updates.value)}`,
+        '}',
+        '',
+      ].join('\n');
+    }
+    const lines = [
+      '# Made with the README config builder. Check every name!',
+      `AUTHORIZED_ADMINS="${admins.join(' ')}"`,
+      `AUTHORIZED_USERS="${users.join(' ')}"`,
+      `CRITICAL_SERVICES="${services.join(' ')}"`,
+      `NEW_PASSWORD=${shQuote(password) ?? '""'}`,
+    ];
+    if (os === 'linux') lines.push(`ENABLE_LOCKOUT="${el.lockout.value}"`);
+    lines.push(`FULL_UPGRADE="${el.updates.value}"`);
+    if (os === 'linux') lines.push(`SSH_PASSWORD_AUTH="${el.sshpw.value}"`);
+    lines.push(`EXTRA_PORTS="${ports}"`, '');
+    return lines.join('\n');
+  }
+
+  function runSteps(): { text: string; cmd?: string }[] {
+    if (os === 'windows') {
+      return [
+        { text: 'Save the file next to Harden.ps1. Open PowerShell as Administrator in that folder.' },
+        {
+          text: 'Audit first (changes nothing, shows what it would do):',
+          cmd: 'powershell -ExecutionPolicy Bypass -File .\\Harden.ps1 -Mode Audit -Config .\\my-readme.psd1',
+        },
+        { text: 'Read the REVIEW lines. Then apply the fixes:', cmd: 'powershell -ExecutionPolicy Bypass -File .\\Harden.ps1 -Mode Apply -Config .\\my-readme.psd1' },
+        { text: 'Your to-do list is in C:\\harden-toolkit\\findings-*.txt' },
+      ];
+    }
+    if (os === 'freebsd') {
+      return [
+        { text: 'Save the file next to harden.sh, then become root:', cmd: 'su -' },
+        { text: 'Audit first (changes nothing):', cmd: 'sh harden.sh --audit --config my.conf' },
+        { text: 'Read the REVIEW lines. Then apply the fixes:', cmd: 'sh harden.sh --apply --config my.conf' },
+      ];
+    }
+    return [
+      { text: 'Save the file next to harden.sh (usually in Downloads), then open a terminal there.' },
+      { text: 'Audit first (changes nothing, shows what it would do):', cmd: 'sudo bash harden.sh --audit --config my.conf' },
+      { text: 'Read the REVIEW lines. Then apply the fixes:', cmd: 'sudo bash harden.sh --apply --config my.conf' },
+      { text: 'Your to-do list:', cmd: 'sudo cat /root/cyberpatriot/findings-*.txt' },
+    ];
+  }
+
+  let fileText = '';
+
+  function update() {
+    const admins = splitNames(el.admins.value);
+    const users = splitNames(el.users.value);
+    const me = el.me.value.trim();
+    const services = [...selected];
+    const mode = el.passMode.value;
+    const password = mode === 'skip' ? 'skip' : mode === 'ask' ? '' : el.pass.value;
+    el.passWrap.hidden = mode !== 'set';
+    el.strength.hidden = mode !== 'set';
+
+    // Name chips
+    for (const [kind, list] of [
+      ['admins', admins],
+      ['users', users],
+    ] as const) {
+      const box = document.querySelector(`[data-cb-chips="${kind}"]`)!;
+      box.innerHTML = list
+        .map((n) => {
+          const dup = admins.includes(n) && users.includes(n);
+          return `<span class="cp-pill ${dup ? 'cp-pill--danger' : kind === 'admins' ? '' : 'cp-pill--muted'}">${esc(n)}${n === me ? ' (you)' : ''}</span>`;
+        })
+        .join('');
+    }
+
+    // Checks
+    const checks: [string, string][] = [];
+    if (!admins.length) checks.push(['warn', 'No administrators yet. Every README lists at least one.']);
+    const both = admins.filter((a) => users.includes(a));
+    if (both.length) checks.push(['danger', `Listed as both admin and user: ${both.join(', ')}. Put each name in one list only.`]);
+    const bad = [...admins, ...users].filter((n) => !/^[a-z_][a-z0-9._-]*\$?$/i.test(n));
+    if (bad.length) checks.push(['danger', `These don't look like usernames: ${bad.join(', ')}`]);
+    const upper = [...admins, ...users].filter((n) => /[A-Z]/.test(n));
+    if (upper.length) checks.push(['warn', `Usernames are case-sensitive and usually lowercase: ${upper.join(', ')}. Copy them exactly.`]);
+    if (me && !admins.includes(me)) checks.push(['warn', `You (${me}) are not in the admin list. The script keeps you, but check the README.`]);
+    if (mode === 'set') {
+      const issues = passwordIssues(el.pass.value);
+      el.strength.textContent = el.pass.value
+        ? issues.length
+          ? `Needs ${issues.join(', ')}.`
+          : 'Strong password ✓'
+        : 'Type a password or press Generate.';
+      el.strength.className = `cb__strength ${el.pass.value && !issues.length ? 'is-ok' : 'is-bad'}`;
+      if (!el.pass.value) checks.push(['warn', 'No password set: the script will ask for one.']);
+      else if (issues.length) checks.push(['warn', `Weak password: needs ${issues.join(', ')}.`]);
+      if (os !== 'windows' && el.pass.value.includes('"') && el.pass.value.includes("'"))
+        checks.push(['danger', 'The password can’t contain both " and \' for this script. Remove one of them.']);
+    }
+    if (!services.length) checks.push(['info', 'No critical services ticked. That’s fine if the README lists none.']);
+    if (!checks.length) checks.push(['success', 'Looks good. Double-check every name against the README once more.']);
+    el.checks.innerHTML = checks.map(([k, t]) => `<p class="cp-callout cp-callout--${k}">${esc(t)}</p>`).join('');
+
+    // Output
+    fileText = buildFile(admins, users, services, password);
+    el.output.textContent = fileText;
+    el.filename.textContent = os === 'windows' ? 'my-readme.psd1' : 'my.conf';
+    el.run.innerHTML = runSteps()
+      .map(
+        (s) =>
+          `<li><p>${esc(s.text)}</p>${
+            s.cmd ? `<div class="cb__cmd"><code>${esc(s.cmd)}</code><button type="button" class="cp-btn cp-btn--sm" data-copy="${esc(s.cmd).replace(/"/g, '&quot;')}">Copy</button></div>` : ''
+          }</li>`,
+      )
+      .join('');
+
+    // Remember everything except the password
+    setValue('config-builder', {
+      os,
+      admins: el.admins.value,
+      users: el.users.value,
+      me,
+      services,
+      passMode: mode,
+      lockout: el.lockout.value,
+      updates: el.updates.value,
+      sshpw: el.sshpw.value,
+      ports: el.ports.value,
+    });
+  }
+
+  async function copy(text: string, btn: HTMLButtonElement) {
+    try {
+      await navigator.clipboard.writeText(text);
+      const old = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => (btn.textContent = old), 1500);
+    } catch {
+      window.prompt('Copy this:', text);
+    }
+  }
+
+  // ---- events
+  el.os.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-os]');
+    if (b) setOS(b.dataset.os as OS);
+  });
+  form.addEventListener('input', update);
+  form.addEventListener('change', update);
+  $('[data-cb-generate]').addEventListener('click', () => {
+    el.pass.value = generatePassword();
+    update();
+  });
+  $('[data-cb-parse]').addEventListener('click', () => {
+    const r = parseReadme(el.readme.value);
+    if (!r.admins.length && !r.users.length && !r.services.size) {
+      el.parseResult.textContent = 'No names found. Make sure you pasted the "Authorized Administrators" part.';
+      el.parseResult.className = 'cb__parse-result is-bad';
+      return;
+    }
+    if (r.admins.length) el.admins.value = r.admins.join(' ');
+    if (r.users.length) el.users.value = r.users.join(' ');
+    if (r.me) el.me.value = r.me;
+    if (r.services.size) selected = new Set(r.services);
+    renderServices();
+    update();
+    el.parseResult.textContent = `Found ${r.admins.length} admin${r.admins.length === 1 ? '' : 's'}, ${r.users.length} user${
+      r.users.length === 1 ? '' : 's'
+    }${r.services.size ? ` and ${r.services.size} critical service${r.services.size === 1 ? '' : 's'}` : ''}. Check them below.`;
+    el.parseResult.className = 'cb__parse-result is-ok';
+  });
+  $<HTMLButtonElement>('[data-cb-copy]').addEventListener('click', (e) => copy(fileText, e.currentTarget as HTMLButtonElement));
+  $('[data-cb-download]').addEventListener('click', () => {
+    const blob = new Blob([fileText.replace(/\n/g, os === 'windows' ? '\r\n' : '\n')], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = os === 'windows' ? 'my-readme.psd1' : 'my.conf';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  el.run.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-copy]');
+    if (b) copy(b.dataset.copy as string, b);
+  });
+  $('[data-cb-clear]').addEventListener('click', () => {
+    if (!confirm('Clear everything on this form?')) return;
+    form.reset();
+    el.readme.value = '';
+    el.parseResult.textContent = '';
+    selected = new Set(os === 'windows' ? [] : ['ssh']);
+    renderServices();
+    update();
+  });
+
+  // ---- restore
+  const saved = getValue<Record<string, any> | null>('config-builder', null);
+  if (saved) {
+    el.admins.value = saved.admins ?? '';
+    el.users.value = saved.users ?? '';
+    el.me.value = saved.me ?? '';
+    el.passMode.value = saved.passMode ?? 'set';
+    el.lockout.value = saved.lockout ?? 'yes';
+    el.updates.value = saved.updates ?? 'ask';
+    el.sshpw.value = saved.sshpw ?? 'keep';
+    el.ports.value = saved.ports ?? '';
+    os = saved.os ?? 'linux';
+    selected = new Set(saved.services ?? []);
+    const keep = selected;
+    setOS(os);
+    selected = keep;
+    renderServices();
+  } else {
+    el.lockout.value = 'yes';
+    setOS('linux');
+  }
+  update();
+</script>
+
+<style>
+  .cb__intro {
+    max-width: 48rem;
+    margin: 0 0 1.5rem;
+    color: var(--sl-color-gray-2);
+  }
+  .cb__layout {
+    display: grid;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (min-width: 64rem) {
+    .cb__layout {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .cb__out-inner {
+      position: sticky;
+      top: calc(var(--sl-nav-height) + 1.5rem);
+    }
+  }
+  .cb__form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  .cb__card {
+    min-width: 0;
+    margin: 0;
+    padding: 1.1rem 1.2rem 1.25rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .cb__step {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.85rem;
+    padding: 0;
+    color: var(--sl-color-white);
+    font-weight: 700;
+  }
+  .cb__step span {
+    display: grid;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+    font-size: var(--sl-text-xs);
+  }
+  .cb__os-hint {
+    margin-top: 0.6rem;
+  }
+  .cb__lead {
+    margin-bottom: 0.75rem;
+  }
+  .cb__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .cb__parse-result {
+    font-size: var(--sl-text-sm);
+  }
+  .cb__parse-result.is-ok {
+    color: var(--cp-success);
+  }
+  .cb__parse-result.is-bad {
+    color: var(--cp-warn);
+  }
+  .cb__users {
+    min-height: 4.5rem;
+  }
+  .cb__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .cb__chips:empty {
+    display: none;
+  }
+  .cb__services {
+    display: grid;
+    gap: 0.4rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 13.5rem), 1fr));
+  }
+  .cb__services :global(.cb__svc) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    color: var(--sl-color-gray-1);
+    font-size: var(--sl-text-sm);
+    cursor: pointer;
+  }
+  .cb__services :global(.cb__svc:has(input:checked)) {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+  }
+  .cb__services :global(.cb__svc input) {
+    accent-color: var(--sl-color-accent);
+  }
+  .cb__services :global(.cb__svc code) {
+    margin-inline-start: auto;
+    color: var(--sl-color-gray-3);
+    font-size: 0.7rem;
+  }
+  .cb__pass {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .cb__pass .cp-input {
+    font-family: var(--sl-font-mono);
+  }
+  .cb__strength {
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+  }
+  .cb__strength.is-ok {
+    color: var(--cp-success);
+  }
+  .cb__strength.is-bad {
+    color: var(--cp-warn);
+  }
+  .cb__clear {
+    justify-self: start;
+  }
+  .cb__checks {
+    display: grid;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .cb__file {
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+    overflow: hidden;
+  }
+  .cb__file-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem 0.6rem 1rem;
+    border-bottom: 1px solid var(--cp-border);
+    background: var(--sl-color-gray-6);
+  }
+  .cb__file-name {
+    color: var(--sl-color-white);
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+  .cb__file-actions {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .cb__code {
+    margin: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    background: var(--sl-color-black);
+    color: var(--sl-color-gray-1);
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-xs);
+    line-height: 1.7;
+  }
+  .cb__h {
+    margin: 1.5rem 0 0.75rem;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-lg);
+  }
+  .cb__run {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
+    padding-inline-start: 1.25rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+  .cb__run :global(p) {
+    margin: 0 0 0.35rem;
+  }
+  .cb__run :global(.cb__cmd) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.4rem 0.4rem 0.75rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-black);
+  }
+  .cb__run :global(.cb__cmd code) {
+    flex: 1;
+    overflow-x: auto;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-xs);
+    white-space: nowrap;
+  }
+</style>

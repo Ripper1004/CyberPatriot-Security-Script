@@ -1,0 +1,75 @@
+---
+// Shown under the title of every checklist: which rounds use this OS, the
+// matching script, and the progress card with its controls.
+import { checklistById, roundsFor, SCRIPTS } from '../data/site';
+
+interface Props {
+  id: string;
+  page: string;
+  total: number;
+}
+const { id, page, total } = Astro.props;
+const checklist = checklistById(id);
+const rounds = checklist ? roundsFor(checklist.image) : [];
+const script = SCRIPTS.find((s) => s.id === checklist?.script);
+---
+
+<div class="cp-cl-meta not-content" data-pagefind-ignore>
+  {
+    rounds.length ? (
+      <span class="cp-cl-meta__item">
+        <span class="cp-cl-meta__label">CP-19 rounds</span>
+        {rounds.map((r) => (
+          <span class="cp-pill" title={r.dates}>
+            {r.name}
+          </span>
+        ))}
+      </span>
+    ) : (
+      <span class="cp-cl-meta__item">
+        <span class="cp-pill cp-pill--muted">Not in CP-19 · older practice images</span>
+      </span>
+    )
+  }
+  {
+    script && (
+      <a class="cp-cl-meta__item cp-cl-meta__link" href={`/downloads/#${script.id}`}>
+        <span class="cp-cl-meta__label">Script</span>
+        <code>{script.file.split('/').slice(1).join('/')}</code>
+      </a>
+    )
+  }
+</div>
+
+<section class="cp-progress not-content" data-cp-progress data-page={page} data-total={total} aria-label="Checklist progress" data-pagefind-ignore>
+  <div class="cp-progress__top">
+    <p class="cp-progress__count">
+      <strong data-cp-count>0</strong> of {total} steps done
+    </p>
+    <p class="cp-progress__pct" data-cp-pct>0%</p>
+  </div>
+  <div
+    class="cp-bar"
+    role="progressbar"
+    aria-label="Steps done"
+    aria-valuemin="0"
+    aria-valuemax={total}
+    aria-valuenow="0"
+    data-cp-bar
+  >
+    <span class="cp-bar__fill" style="width:0%"></span>
+  </div>
+  <div class="cp-progress__actions">
+    <button type="button" class="cp-btn cp-btn--primary cp-btn--sm" data-cp-action="next">Go to next step ↓</button>
+    <button type="button" class="cp-btn cp-btn--sm" data-cp-action="hide" aria-pressed="false">Hide finished steps</button>
+    <button type="button" class="cp-btn cp-btn--sm" data-cp-action="print">Print</button>
+    <button type="button" class="cp-btn cp-btn--sm cp-btn--ghost" data-cp-action="reset">Reset for a new image</button>
+  </div>
+  <p class="cp-progress__note" data-cp-storage-warning hidden>
+    Your browser is blocking storage, so ticks won't be remembered after you leave this page.
+  </p>
+</section>
+
+<div class="cp-topbar" aria-hidden="true" data-cp-topbar>
+  <span class="cp-topbar__fill"></span>
+</div>

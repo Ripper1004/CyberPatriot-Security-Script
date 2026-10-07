@@ -1,0 +1,48 @@
+---
+// Wraps page content so the client script knows which page it is on, and
+// adds a "mark as read / next lesson" card to the end of each lesson.
+import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+import { lessons } from '../../data/site';
+
+const { entry } = Astro.locals.starlightRoute;
+const cp = (entry.data as { cp?: { kind: string; id: string; lesson?: number; steps?: number } }).cp;
+const lesson = cp?.lesson ? lessons[cp.lesson - 1] : undefined;
+const next = lesson ? lessons[lesson.n] : undefined;
+---
+
+<Default>
+  <div class="cp-content" data-cp-page={entry.id} data-cp-kind={cp?.kind ?? 'page'}>
+    <slot />
+  </div>
+  {
+    lesson && (
+      <section class="cp-lesson-done not-content" data-cp-lesson={lesson.id} aria-label="Lesson progress" data-pagefind-ignore>
+        <div>
+          <p class="cp-lesson-done__title">Finished reading?</p>
+          <p class="cp-lesson-done__text">
+            Mark it as read to track your progress through the {lessons.length}-lesson path.
+          </p>
+        </div>
+        <div class="cp-lesson-done__actions">
+          <button type="button" class="cp-btn cp-btn--primary" data-cp-lesson-toggle aria-pressed="false">
+            <span data-label-off>Mark as read</span>
+            <span data-label-on hidden>✓ Read. Undo?</span>
+          </button>
+          {next ? (
+            <a class="cp-btn" href={next.route}>
+              Next: {next.label} →
+            </a>
+          ) : (
+            <a class="cp-btn" href="/#checklists">
+              Pick your checklist →
+            </a>
+          )}
+        </div>
+      </section>
+    )
+  }
+</Default>
+
+<script>
+  import '../../scripts/content';
+</script>

@@ -1,0 +1,295 @@
+---
+// Custom hero for the home page (the only page with `hero` frontmatter).
+const PAGE_TITLE_ID = '_top'; // same id Starlight uses for page titles
+import Default from '@astrojs/starlight/components/Hero.astro';
+import { SEASON } from '../../data/site';
+
+const isHome = Astro.url.pathname === '/' || Astro.url.pathname === '/index.html';
+
+const { data } = Astro.locals.starlightRoute.entry;
+const title = data.hero?.title ?? data.title;
+const tagline = data.hero?.tagline;
+---
+
+{!isHome && <Default />}
+{isHome && (
+<section class="cp-hero not-content" data-pagefind-ignore>
+  <div class="cp-hero__text">
+    <p class="cp-hero__eyebrow">
+      <span class="cp-hero__dot" aria-hidden="true"></span>
+      {SEASON.name} · {SEASON.years} practice
+    </p>
+    <h1 id={PAGE_TITLE_ID} class="cp-hero__title" set:html={title} />
+    {tagline && <p class="cp-hero__tagline" set:html={tagline} />}
+    <div class="cp-hero__actions">
+      <a class="cp-btn cp-btn--primary cp-btn--lg" href="/start-here/what-is-cyberpatriot/">
+        I'm new: start lesson 1 →
+      </a>
+      <a class="cp-btn cp-btn--lg" href="#checklists">Open a checklist</a>
+    </div>
+    <p class="cp-hero__note">No account, no GitHub. Your progress is saved in this browser.</p>
+  </div>
+
+  <div class="cp-hero__art" aria-hidden="true">
+    <div class="cp-report">
+      <div class="cp-report__bar">
+        <span></span><span></span><span></span>
+        <p>Scoring Report</p>
+      </div>
+      <div class="cp-report__score">
+        <div>
+          <p class="cp-report__label">Current score</p>
+          <p class="cp-report__big">58<small>/100</small></p>
+        </div>
+        <div class="cp-report__ring">
+          <svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.5" pathLength="100"></circle><circle
+              class="cp-report__ring-fill"
+              cx="18"
+              cy="18"
+              r="15.5"
+              pathLength="100"></circle></svg>
+        </div>
+      </div>
+      <ul class="cp-report__list">
+        <li class="ok"><span>✓</span> Forensics Question 1 correct <b>+8</b></li>
+        <li class="ok"><span>✓</span> Removed unauthorized user mallory <b>+4</b></li>
+        <li class="ok"><span>✓</span> Firewall protection enabled <b>+3</b></li>
+        <li class="ok"><span>✓</span> SSH root login disabled <b>+4</b></li>
+        <li class="bad"><span>!</span> Penalty: Apache stopped <b>−5</b></li>
+      </ul>
+    </div>
+    <div class="cp-hero__chip cp-hero__chip--a">✓ 12 of 64 steps</div>
+    <div class="cp-hero__chip cp-hero__chip--b">⏱ 2:41:07 left</div>
+  </div>
+</section>
+)}
+
+<style>
+  .cp-hero {
+    position: relative;
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+    padding: 2.5rem 0 1rem;
+  }
+  @media (min-width: 60rem) {
+    .cp-hero {
+      grid-template-columns: 1.15fr 1fr;
+      padding: 4rem 0 2rem;
+    }
+  }
+  .cp-hero__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 999px;
+    background: var(--cp-card);
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+  }
+  .cp-hero__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--cp-success);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--cp-success) 25%, transparent);
+  }
+  .cp-hero__title {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: clamp(2.2rem, 5.5vw, 3.6rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+  }
+  .cp-hero__title :global(em) {
+    font-style: normal;
+    background: var(--cp-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .cp-hero__tagline {
+    max-width: 36rem;
+    margin: 1.25rem 0 0;
+    color: var(--sl-color-gray-2);
+    font-size: clamp(1.05rem, 2vw, 1.2rem);
+    line-height: 1.6;
+  }
+  .cp-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.75rem;
+  }
+  .cp-hero__actions :global(.cp-btn--lg) {
+    min-height: 3rem;
+    padding: 0.7rem 1.35rem;
+    font-size: var(--sl-text-base);
+  }
+  .cp-hero__note {
+    margin: 1rem 0 0;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+
+  .cp-hero__art {
+    position: relative;
+    max-width: 26rem;
+    width: 100%;
+    margin-inline: auto;
+  }
+  .cp-report {
+    border: 1px solid var(--cp-border);
+    border-radius: 1rem;
+    background: var(--cp-card);
+    box-shadow:
+      var(--cp-shadow),
+      0 30px 60px -30px rgb(37 99 235 / 0.45);
+    overflow: hidden;
+    transform: rotate(-1.5deg);
+  }
+  .cp-report__bar {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid var(--cp-border);
+    background: var(--sl-color-gray-6);
+  }
+  .cp-report__bar span {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: var(--sl-color-gray-4);
+  }
+  .cp-report__bar p {
+    margin: 0 0 0 0.5rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+  }
+  .cp-report__score {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.15rem 0.5rem;
+  }
+  .cp-report__label {
+    margin: 0;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .cp-report__big {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: 2.6rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  .cp-report__big small {
+    color: var(--sl-color-gray-3);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .cp-report__ring svg {
+    width: 4rem;
+    height: 4rem;
+    transform: rotate(-90deg);
+  }
+  .cp-report__ring circle {
+    fill: none;
+    stroke: var(--sl-color-gray-5);
+    stroke-width: 4;
+  }
+  .cp-report__ring .cp-report__ring-fill {
+    stroke: var(--sl-color-accent);
+    stroke-dasharray: 58 100;
+    stroke-linecap: round;
+  }
+  .cp-report__list {
+    margin: 0;
+    padding: 0.5rem 0.85rem 1rem;
+    list-style: none;
+  }
+  .cp-report__list li {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0.4rem;
+    border-radius: 0.5rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-xs);
+  }
+  .cp-report__list li + li {
+    border-top: 1px dashed var(--cp-border);
+  }
+  .cp-report__list span {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: 800;
+  }
+  .cp-report__list .ok span {
+    background: var(--cp-success-low);
+    color: var(--cp-success);
+  }
+  .cp-report__list .bad {
+    background: var(--cp-danger-low);
+  }
+  .cp-report__list .bad span {
+    background: var(--cp-danger);
+    color: #fff;
+  }
+  .cp-report__list b {
+    margin-inline-start: auto;
+    color: var(--cp-success);
+    font-variant-numeric: tabular-nums;
+  }
+  .cp-report__list .bad b {
+    color: var(--cp-danger);
+  }
+  .cp-hero__chip {
+    position: absolute;
+    padding: 0.45rem 0.8rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 999px;
+    background: var(--cp-card);
+    box-shadow: var(--cp-shadow);
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .cp-hero__chip--a {
+    top: -0.9rem;
+    right: -0.5rem;
+    color: var(--cp-success);
+    transform: rotate(3deg);
+  }
+  .cp-hero__chip--b {
+    bottom: -1rem;
+    left: -0.75rem;
+    transform: rotate(-2deg);
+  }
+  @media (max-width: 30rem) {
+    .cp-hero__chip--a {
+      right: 0;
+    }
+    .cp-hero__chip--b {
+      left: 0;
+    }
+  }
+</style>
