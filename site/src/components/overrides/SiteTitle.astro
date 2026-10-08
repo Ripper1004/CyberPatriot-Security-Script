@@ -1,0 +1,19 @@
+---
+// Site title plus the Toolkit / Learn switch (desktop).
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+import SectionTabs from '../SectionTabs.astro';
+---
+
+<div class="cp-sitetitle">
+  <Default />
+  <SectionTabs variant="header" />
+</div>
+
+<style>
+  .cp-sitetitle {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+</style>

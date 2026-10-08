@@ -1,0 +1,73 @@
+---
+// "Toolkit | Learn" switch, shown in the header and at the top of the mobile menu.
+interface Props {
+  variant?: 'header' | 'sidebar';
+}
+const { variant = 'header' } = Astro.props;
+const section = (Astro.locals.starlightRoute as unknown as { cpSection?: string }).cpSection ?? 'learn';
+const tabs = [
+  { id: 'toolkit', label: 'Toolkit', hint: 'Checklists, tools & scripts', href: '/toolkit/' },
+  { id: 'learn', label: 'Learn', hint: 'New here? Start here', href: '/' },
+];
+---
+
+<nav class:list={['cp-tabs', `cp-tabs--${variant}`]} aria-label="Site sections">
+  {
+    tabs.map((t) => (
+      <a class="cp-tabs__tab" href={t.href} aria-current={t.id === section ? 'true' : undefined} title={t.hint}>
+        {t.label}
+        {variant === 'sidebar' && <span class="cp-tabs__hint">{t.hint}</span>}
+      </a>
+    ))
+  }
+</nav>
+
+<style>
+  .cp-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.2rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 0.7rem;
+    background: var(--sl-color-black);
+  }
+  .cp-tabs__tab {
+    display: grid;
+    flex: 1;
+    gap: 0.05rem;
+    padding: 0.3rem 0.85rem;
+    border-radius: 0.5rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+    font-weight: 650;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .cp-tabs__tab:hover {
+    color: var(--sl-color-white);
+  }
+  .cp-tabs__tab[aria-current='true'] {
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+  }
+  .cp-tabs__hint {
+    font-size: 0.68rem;
+    font-weight: 500;
+    opacity: 0.8;
+  }
+  .cp-tabs--header {
+    display: none;
+  }
+  @media (min-width: 50rem) {
+    .cp-tabs--header {
+      display: flex;
+    }
+    .cp-tabs--sidebar {
+      display: none;
+    }
+  }
+  .cp-tabs--sidebar {
+    margin-bottom: 1rem;
+  }
+</style>

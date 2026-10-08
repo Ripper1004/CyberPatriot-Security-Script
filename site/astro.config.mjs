@@ -40,6 +40,8 @@ export default defineConfig({
       ],
       components: {
         PageTitle: './src/components/overrides/PageTitle.astro',
+        SiteTitle: './src/components/overrides/SiteTitle.astro',
+        Sidebar: './src/components/overrides/Sidebar.astro',
         MarkdownContent: './src/components/overrides/MarkdownContent.astro',
         Hero: './src/components/overrides/Hero.astro',
       },
@@ -52,15 +54,15 @@ export default defineConfig({
         themes: ['github-dark-default', 'github-light-default'],
         styleOverrides: { borderRadius: '0.6rem', codeFontFamily: "'JetBrains Mono Variable', ui-monospace, monospace" },
       },
+      // Two sections. src/routeData.ts shows only the current section's groups:
+      // Toolkit = what experienced people use during a round, Learn = for beginners.
+      // Group labels starting with "Learn" belong to the Learn section.
       sidebar: [
         {
-          label: 'Start here',
+          label: 'Toolkit',
           items: [
-            { label: 'Welcome', link: '/' },
-            ...LEARNING_PATH.map((l, i) => ({
-              label: `${i + 1}. ${l.label}`,
-              link: `/${l.path.replace(/\.md$/, '')}/`,
-            })),
+            { label: 'Dashboard', link: '/toolkit/' },
+            { label: 'My progress', link: '/progress/' },
           ],
         },
         {
@@ -72,28 +74,43 @@ export default defineConfig({
           })),
         },
         {
-          label: 'Guides',
-          items: [
-            { label: 'Forensics questions', link: '/guides/forensics-questions/' },
-            { label: 'Linux service hardening', link: '/guides/linux-service-hardening/' },
-            { label: 'Glossary', link: '/guides/glossary/' },
-            { label: 'For mentors & teachers', link: '/guides/for-mentors-and-teachers/' },
-          ],
-        },
-        {
           label: 'Tools',
           items: [
             { label: 'README config builder', link: '/tools/config-builder/' },
             { label: 'Round timer', link: '/tools/round-timer/' },
             { label: 'Command finder', link: '/tools/commands/' },
-            { label: 'Glossary quiz', link: '/tools/glossary-quiz/' },
             { label: 'Download the scripts', link: '/downloads/' },
-            { label: 'My progress', link: '/progress/' },
           ],
         },
-        { label: 'About this site', link: '/about/' },
+        {
+          label: 'Reference',
+          items: [
+            { label: 'Forensics questions', link: '/guides/forensics-questions/' },
+            { label: 'Linux service hardening', link: '/guides/linux-service-hardening/' },
+          ],
+        },
+        {
+          label: 'Learn: Start here',
+          items: [
+            { label: 'Welcome', link: '/' },
+            ...LEARNING_PATH.map((l, i) => ({
+              label: `${i + 1}. ${l.label}`,
+              link: `/${l.path.replace(/\.md$/, '')}/`,
+            })),
+          ],
+        },
+        {
+          label: 'Learn: Glossary & more',
+          items: [
+            { label: 'Glossary', link: '/guides/glossary/' },
+            { label: 'Glossary quiz', link: '/tools/glossary-quiz/' },
+            { label: 'For mentors & teachers', link: '/guides/for-mentors-and-teachers/' },
+            { label: 'About this site', link: '/about/' },
+          ],
+        },
       ],
-      plugins: [starlightLinksValidator({ errorOnLocalLinks: true, exclude: ['/', '/#checklists', '/files/**', '/tools/**', '/progress/', '/downloads/'] })],
+      routeMiddleware: './src/routeData.ts',
+      plugins: [starlightLinksValidator({ errorOnLocalLinks: true, exclude: ['/', '/#checklists', '/toolkit/', '/files/**', '/tools/**', '/progress/', '/downloads/'] })],
     }),
   ],
 });

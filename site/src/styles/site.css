@@ -702,3 +702,11 @@ fieldset > legend + * {
 .cp-script-key > .cp-btn {
   justify-self: start;
 }
+
+/* Compact view on checklists: hide the beginner explanations */
+.sl-markdown-content .cp-compact .cp-explain {
+  display: none;
+}
+.sl-markdown-content .cp-compact .cp-block {
+  margin-top: 1.1rem;
+}
