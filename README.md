@@ -88,6 +88,17 @@ bash tests/linux/run-tests.sh                 # needs Docker
 pwsh tests/windows/Test-HardenLogic.ps1       # needs PowerShell 7
 ```
 
+### How the checklists are tested
+
+[`tests/checklists/`](tests/checklists/README.md) checks the checklists themselves. The Linux ones are run command by command in a container with the practice problems planted (`linux_lab.py linux-mint`, `debian`, `ubuntu`). The Windows and FreeBSD ones are only syntax-checked (PowerShell parser, `dash`, `shellcheck`) and reviewed against the Microsoft and FreeBSD documentation, because no Windows or FreeBSD image is available to run them. Run them on a real image before relying on them.
+
+```bash
+python3 tests/checklists/check-format.py                        # numbering, unique step ids, script tags
+bash tests/checklists/check-shell.sh                            # bash / sh syntax, <placeholders>
+pwsh -NoProfile -File tests/checklists/check-powershell.ps1     # PowerShell syntax
+python3 tests/checklists/linux_lab.py linux-mint                # needs Docker
+```
+
 ---
 
 ## Plans
