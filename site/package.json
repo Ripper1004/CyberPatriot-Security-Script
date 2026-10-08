@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "1.0.0",
-  "description": "Website for the CyberPatriot Practice Toolkit (Astro + Starlight, deployed on Cloudflare Pages)",
+  "description": "Website for the CyberPatriot Toolkit (Astro + Starlight, deployed on Cloudflare Pages)",
   "engines": {
     "node": ">=20.19"
   },

@@ -6,22 +6,7 @@ cp:
   id: about
 ---
 
-The **CyberPatriot Practice Toolkit** is a training site for students learning to secure computers in the style of the [CyberPatriot](https://www.uscyberpatriot.org/) competition. It gathers step-by-step checklists, beginner lessons, practice tools and hardening scripts in one place, so nobody needs a GitHub account to use them.
-
-## Practice only
-
-This toolkit is for **practice and learning** on practice virtual machines.
-
-:::caution[Competition rules]
-The CyberPatriot 19 Rules Book says:
-
-- **3010.4:** scripts made with the help of AI may **not** be used during a competition round, and paid AI tools may not be used in connection with the competition. Parts of this toolkit were written with AI help.
-- **3011.5:** publicly posting scripts or resources made for CyberPatriot is **prohibited**.
-
-If your school competes, use this site to learn, then have your team write its own materials and keep them private.
-:::
-
-Never run the scripts on a computer you don't own or aren't allowed to change.
+The **CyberPatriot Toolkit** gathers step-by-step checklists, beginner lessons, tools and hardening scripts for the [CyberPatriot](https://www.uscyberpatriot.org/) competition in one place, so nobody needs a GitHub account to use them.
 
 ## Your data
 

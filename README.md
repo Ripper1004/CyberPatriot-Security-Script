@@ -1,4 +1,4 @@
-# CyberPatriot Practice Toolkit
+# CyberPatriot Toolkit
 
 Beginner-friendly **checklists**, **guides** and **hardening scripts** for practicing CyberPatriot image challenges on Windows, Windows Server, Linux Mint, Debian, Ubuntu and FreeBSD.
 
@@ -96,12 +96,5 @@ See [ROADMAP.md](ROADMAP.md): what was wrong with the old scripts, the design of
 - Script changes: add a planted problem to `tests/linux/plant-vulns.sh` and a check to `tests/linux/verify.sh`, then run the tests.
 - Older versions of the scripts and checklists are in the git history.
 
-## Important: competition rules
-This toolkit is for **practice and learning**. The CyberPatriot 19 Rules Book says:
-- **3010.4:** scripts created with the help of AI may **not** be used during a competition round. Paid AI tools may not be used in connection with the competition.
-- **3011.5:** publicly posting scripts or resources made for CyberPatriot is **prohibited**.
-
-If your school registers a team again: make this repository **private**, and have the team write its own competition materials.
-
-## License and disclaimer
-Provided "as is", for training on practice virtual machines only. Never run these scripts on a computer you don't own or aren't authorized to change.
+## License
+Provided "as is".

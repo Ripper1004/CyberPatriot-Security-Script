@@ -64,6 +64,3 @@ Older practice images may also be Windows 10, Windows Server 2019, or Ubuntu. Th
 5. [Things that lose points](../guides/things-that-lose-points.md). Read this before you touch anything.
 6. [Forensics questions](../guides/forensics-questions.md)
 7. [Glossary](../guides/glossary.md), if a word confuses you.
-
-> [!NOTE]
-> **About the rules.** This toolkit is for **practice**. If your school registers a team again, the CyberPatriot 19 rules (section 3010.4) do **not** allow scripts that were written with AI help during a competition round. They also don't allow (section 3011.5) posting scripts made for CyberPatriot publicly. Use these scripts and checklists to **learn**, then write your team's own competition materials.

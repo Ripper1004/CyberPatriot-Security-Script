@@ -147,7 +147,7 @@ function initSteps(content: HTMLElement) {
       );
       if (ok) setStepsDone(page, auto.map((s) => s.id), true);
     } else if (action === 'reset') {
-      if (confirm('Clear every tick on this checklist? Do this when you start a fresh practice image.')) resetSteps(page);
+      if (confirm('Clear every tick on this checklist? Do this when you start a fresh image.')) resetSteps(page);
     }
   });
 

@@ -17,7 +17,7 @@ const tagline = data.hero?.tagline;
   <div class="cp-hero__text">
     <p class="cp-hero__eyebrow">
       <span class="cp-hero__dot" aria-hidden="true"></span>
-      {SEASON.name} · {SEASON.years} practice
+      {SEASON.name} · {SEASON.years}
     </p>
     <h1 id={PAGE_TITLE_ID} class="cp-hero__title" set:html={title} />
     {tagline && <p class="cp-hero__tagline" set:html={tagline} />}

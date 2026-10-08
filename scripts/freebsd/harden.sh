@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC2086,SC2013  # name lists are split into words on purpose
 # =============================================================================
-#  CyberPatriot Practice Toolkit - FreeBSD Hardening Script (FreeBSD 13 / 14)
+#  CyberPatriot Toolkit - FreeBSD Hardening Script (FreeBSD 13 / 14)
 #
 #  READ FIRST: docs/start-here/using-the-scripts.md and docs/checklists/freebsd.md
 #
@@ -332,7 +332,7 @@ sec_firewall() {
   [ -n "$_tports" ] && info "Ports kept open for critical services: $_tports"
   _rules=$(mktemp)
   {
-    echo "# /etc/pf.conf - written by the CyberPatriot practice toolkit (harden.sh)"
+    echo "# /etc/pf.conf - written by the CyberPatriot toolkit (harden.sh)"
     echo "set skip on lo0"
     echo "set block-policy drop"
     echo "scrub in all"
@@ -716,7 +716,7 @@ done
 mkdir -p "$WORK_DIR" && chmod 700 "$WORK_DIR"
 : >"$LOG_FILE"; : >"$RESULTS_FILE"
 printf '# Findings report - %s\n' "$(date)" >"$REPORT_FILE"
-printf '\n%s CyberPatriot Practice Toolkit - FreeBSD hardening v%s%s\n' "$CYN" "$VERSION" "$RST"
+printf '\n%s CyberPatriot Toolkit - FreeBSD hardening v%s%s\n' "$CYN" "$VERSION" "$RST"
 echo "  System: $(freebsd-version 2>/dev/null || uname -r)"
 if [ -n "$CONFIG_FILE" ]; then load_config "$CONFIG_FILE"; elif [ "$ASSUME_YES" -eq 0 ]; then prompt_readme; fi
 finalize_readme

@@ -1,6 +1,6 @@
 # Website
 
-The CyberPatriot Practice Toolkit website: [Astro](https://astro.build/) + [Starlight](https://starlight.astro.build/), hosted on **Cloudflare Pages**.
+The CyberPatriot Toolkit website: [Astro](https://astro.build/) + [Starlight](https://starlight.astro.build/), hosted on **Cloudflare Pages**.
 
 **The content is not in this folder.** At build time, `scripts/sync-docs.mjs` copies `../docs/**/*.md` and `../scripts/` into the site. To change a checklist or guide, edit the file in [`docs/`](../docs). Never edit `src/content/docs/checklists|guides|start-here`: those folders are generated and git-ignored.
 

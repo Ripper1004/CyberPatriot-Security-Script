@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    CyberPatriot Practice Toolkit - Windows hardening script.
+    CyberPatriot Toolkit - Windows hardening script.
     Works on Windows 10, Windows 11, and Windows Server 2016 / 2019 / 2022
     (including Domain Controllers).
 
@@ -1973,7 +1973,7 @@ function Show-Menu {
 # ---------------------------------------------------------------------------
 Set-Content -Path $ReportFile -Value ("# Findings report - {0}`r`n# REVIEW items need a human decision. WOULD = audit mode found something to fix." -f (Get-Date))
 Write-Host ''
-Write-Host " CyberPatriot Practice Toolkit - Windows hardening v$ScriptVersion" -ForegroundColor Cyan
+Write-Host " CyberPatriot Toolkit - Windows hardening v$ScriptVersion" -ForegroundColor Cyan
 $role = if ($script:IsDC) { 'Domain Controller' } elseif ($script:IsServer) { 'Server' } else { 'Workstation' }
 Write-Host "  System: $($script:OsName)   Role: $role   PowerShell: $($PSVersionTable.PSVersion)"
 Write-HardenLog "System: $($script:OsName) ($role)"
