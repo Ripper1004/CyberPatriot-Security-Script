@@ -73,7 +73,7 @@ export const CHECKLISTS = [
     name: 'Ubuntu',
     short: 'Ubuntu',
     family: 'linux',
-    blurb: 'For older practice images. Short: Ubuntu is almost the same as Mint.',
+    blurb: 'For older images. Short: Ubuntu is almost the same as Mint.',
     script: 'linux',
   },
 ];

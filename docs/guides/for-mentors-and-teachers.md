@@ -47,7 +47,3 @@ If you're comfortable with Linux, you can plant problems in a throwaway VM yours
 ## Keeping the material up to date
 
 Everything on the website comes from the `docs/` folder of the GitHub repository. Edit a page there (or use the **Edit page** link at the bottom of any lesson or checklist on the website) and the website rebuilds itself within a few minutes.
-
-## If your school competes again
-
-The CyberPatriot 19 rules say scripts made with AI help may **not** be used during competition rounds (3010.4), paid AI tools may not be used in connection with the competition, and CyberPatriot scripts and resources may not be posted publicly (3011.5). Use this toolkit to learn, have the team write its own competition materials, and keep them private.

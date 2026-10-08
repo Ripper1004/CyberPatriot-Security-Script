@@ -40,7 +40,7 @@ const tools = [
     href: '/downloads/',
     icon: '⬇️',
     title: 'Download the scripts',
-    text: 'The hardening scripts with one-line download commands for the practice VM and checksums.',
+    text: 'The hardening scripts with one-line download commands for the VM and checksums.',
   },
   {
     href: '/progress/',
@@ -60,15 +60,15 @@ const rules = [
 
 <StarlightPage
   frontmatter={{
-    title: 'CyberPatriot Practice Toolkit',
+    title: 'Welcome',
     description:
-      'Beginner-friendly CyberPatriot practice: step-by-step checklists, lessons, tools and hardening scripts for Windows, Windows Server, Linux Mint, Debian and FreeBSD.',
+      'Beginner-friendly CyberPatriot toolkit: step-by-step checklists, lessons, tools and hardening scripts for Windows, Windows Server, Linux Mint, Debian and FreeBSD.',
     template: 'splash',
     editUrl: false,
     hero: {
       title: 'Learn to secure a computer, <em>one step at a time.</em>',
       tagline:
-        'Step-by-step checklists, beginner lessons, practice tools and hardening scripts for every CyberPatriot operating system. Built for people who have never done this before.',
+        'Step-by-step checklists, beginner lessons, tools and hardening scripts for every CyberPatriot operating system. Built for people who have never done this before.',
     },
   }}
 >
@@ -96,7 +96,7 @@ const rules = [
           <h2 id="path-title" class="cp-section-title">New here? Follow the path</h2>
           <p class="cp-section-sub">
             Seven short lessons, about {lessons.reduce((n, l) => n + l.minutes, 0)} minutes in total. Do them in order
-            before your first practice image.
+            before your first image.
           </p>
         </div>
         <p class="cp-home__count" data-cp-path-count>0 of {lessons.length} read</p>
@@ -164,7 +164,7 @@ const rules = [
                   </span>
                   <div>
                     <h3 class="cp-card__title">{c.name}</h3>
-                    <p class="cp-os__image">{rounds.length ? `CP-19 image: ${IMAGE_NAMES[c.image]}` : 'Older practice images'}</p>
+                    <p class="cp-os__image">{rounds.length ? `CP-19 image: ${IMAGE_NAMES[c.image]}` : 'Older images'}</p>
                   </div>
                 </div>
                 <p class="cp-card__text">{c.blurb}</p>
@@ -218,7 +218,7 @@ const rules = [
 
     <!-- Tools -->
     <section class="cp-home__section" aria-labelledby="tools-title">
-      <h2 id="tools-title" class="cp-section-title">Tools that make practice easier</h2>
+      <h2 id="tools-title" class="cp-section-title">Tools that make it easier</h2>
       <p class="cp-section-sub">Everything runs in your browser. Nothing you type is sent anywhere.</p>
       <div class="cp-grid">
         {
@@ -256,12 +256,6 @@ const rules = [
       </div>
     </section>
 
-    <p class="cp-home__legal">
-      This toolkit is for <strong>practice and learning</strong> on practice virtual machines. CyberPatriot 19 rules say
-      AI-assisted scripts may not be used in competition rounds and CyberPatriot scripts may not be posted publicly. <a
-        href="/about/">More about this site</a
-      >.
-    </p>
   </div>
 </StarlightPage>
 
@@ -671,11 +665,4 @@ const rules = [
     font-size: var(--sl-text-sm);
   }
 
-  .cp-home__legal {
-    margin: 4rem 0 0;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--cp-border);
-    color: var(--sl-color-gray-3);
-    font-size: var(--sl-text-sm);
-  }
 </style>

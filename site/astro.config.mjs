@@ -24,9 +24,9 @@ export default defineConfig({
   trailingSlash: 'always',
   integrations: [
     starlight({
-      title: 'CP Practice Toolkit',
+      title: 'CyberPatriot Toolkit',
       description:
-        'Beginner-friendly CyberPatriot practice checklists, guides, tools and hardening scripts for Windows, Windows Server, Linux Mint, Debian, Ubuntu and FreeBSD.',
+        'Beginner-friendly CyberPatriot checklists, guides, tools and hardening scripts for Windows, Windows Server, Linux Mint, Debian, Ubuntu and FreeBSD.',
       logo: { src: './src/assets/logo.svg', alt: '' },
       favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub repository', href: REPO_URL }],

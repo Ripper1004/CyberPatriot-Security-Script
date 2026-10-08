@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2086,SC2016,SC2013,SC2009  # word lists are split on purpose; some $ are literal
 # =============================================================================
-#  CyberPatriot Practice Toolkit - Linux Hardening Script
+#  CyberPatriot Toolkit - Linux Hardening Script
 #
 #  Works on:  Linux Mint 20 / 21 / 22,  Debian 11 / 12,  Ubuntu 20.04 / 22.04 / 24.04
 #
@@ -1840,7 +1840,7 @@ sec_logging() {
       if unit_active auditd && unit_enabled auditd; then result OK "auditd is running"
       else fix "Start auditd" systemctl enable --now auditd; fi
     fi
-    rules="## Added by the CyberPatriot practice toolkit (harden.sh)"
+    rules="## Added by the CyberPatriot toolkit (harden.sh)"
     for p in /etc/passwd /etc/group /etc/shadow /etc/gshadow /etc/security/opasswd; do [[ -e $p ]] && rules+=$'\n'"-w $p -p wa -k identity"; done
     for p in /etc/sudoers /etc/sudoers.d; do [[ -e $p ]] && rules+=$'\n'"-w $p -p wa -k sudoers"; done
     for p in /etc/ssh/sshd_config /etc/pam.d; do [[ -e $p ]] && rules+=$'\n'"-w $p -p wa -k auth_config"; done
@@ -1975,7 +1975,7 @@ sec_desktop() {
   stage_commit "dconf profile (makes system-wide desktop settings apply)"
   stage_begin /etc/dconf/db/local.d/00-cyberpatriot-screenlock
   stage_content <<'EOF'
-# Added by the CyberPatriot practice toolkit (harden.sh)
+# Added by the CyberPatriot toolkit (harden.sh)
 [org/gnome/desktop/screensaver]
 lock-enabled=true
 lock-delay=uint32 0
@@ -2069,7 +2069,7 @@ harden_apache() {
   [[ -e /etc/apache2/mods-enabled/headers.load ]] || fix "Apache: enable the headers module" a2enmod -q headers
   stage_begin /etc/apache2/conf-available/security-headers.conf
   stage_content <<'EOF'
-# Added by the CyberPatriot practice toolkit (harden.sh)
+# Added by the CyberPatriot toolkit (harden.sh)
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"
     Header always set X-Frame-Options "SAMEORIGIN"
@@ -2492,7 +2492,7 @@ menu() {
 
 usage() {
   cat <<EOF
-CyberPatriot practice toolkit - Linux hardening script v$SCRIPT_VERSION
+CyberPatriot toolkit - Linux hardening script v$SCRIPT_VERSION
 Supports Linux Mint 20-22, Debian 11-12 and Ubuntu 20.04-24.04.
 
   sudo bash harden.sh                    interactive menu (starts in AUDIT mode)
@@ -2536,7 +2536,7 @@ main() {
   printf '# Findings report - %s\n# Items marked REVIEW need a human decision. WOULD = audit mode found something to fix.\n' "$(date)" >"$REPORT_FILE"
 
   detect_os
-  printf '\n%s%s CyberPatriot Practice Toolkit - Linux hardening v%s %s\n' "$C_BLD" "$C_CYN" "$SCRIPT_VERSION" "$C_RST"
+  printf '\n%s%s CyberPatriot Toolkit - Linux hardening v%s %s\n' "$C_BLD" "$C_CYN" "$SCRIPT_VERSION" "$C_RST"
   say "  System: $OS_NAME   Desktop: ${DESKTOP:-none}   Login screen: ${DISPLAY_MANAGER:-none}"
   if [[ $IS_MINT -eq 0 && $IS_DEBIAN -eq 0 && $IS_UBUNTU -eq 0 ]]; then
     warn "This script is made for Linux Mint, Debian and Ubuntu. '$OS_NAME' may not work."
