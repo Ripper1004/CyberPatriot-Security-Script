@@ -98,7 +98,7 @@ export const SCRIPTS = [
     config: 'scripts/linux/config.example.conf',
     worksOn: 'Linux Mint 20–22, Debian 11–12, Ubuntu 20.04–24.04',
     language: 'Bash',
-    tested: 'Tested automatically on Debian 12, Ubuntu 22.04 and Linux Mint 21.3 (54 checks).',
+    tested: 'Tested automatically on Debian 12, Ubuntu 22.04 and Linux Mint 21.3 (55 checks).',
     testedLevel: 'tested',
     run: 'sudo bash harden.sh',
   },
