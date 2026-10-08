@@ -644,3 +644,61 @@ fieldset > legend {
 fieldset > legend + * {
   clear: both;
 }
+
+/* ---------------------------------------------------------------- script tags */
+.sl-markdown-content .cp-script {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--cp-border);
+  border-left-width: 4px;
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-card);
+  color: var(--sl-color-gray-2);
+  font-size: var(--sl-text-sm);
+  line-height: 1.5;
+}
+.sl-markdown-content .cp-script--auto {
+  border-left-color: var(--cp-success);
+}
+.sl-markdown-content .cp-script--review {
+  border-left-color: var(--sl-color-accent);
+}
+.sl-markdown-content .cp-script--manual {
+  border-left-color: var(--sl-color-gray-4);
+}
+.cp-script__icon {
+  flex: none;
+}
+.cp-script__label {
+  color: var(--sl-color-white);
+  font-weight: 700;
+}
+.cp-script-key {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--cp-border);
+}
+.cp-script-key__text {
+  margin: 0;
+  color: var(--sl-color-gray-2);
+  font-size: var(--sl-text-sm);
+}
+.cp-script-key__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+}
+.cp-script-key > .cp-btn {
+  justify-self: start;
+}

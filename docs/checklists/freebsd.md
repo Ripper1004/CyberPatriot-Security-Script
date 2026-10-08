@@ -25,7 +25,7 @@ FreeBSD may appear in the **Semifinals** (depending on tier). It's a Unix like L
 | Home folders | `/home` | `/home` (really `/usr/home`) |
 
 > [!TIP]
-> The FreeBSD script (`scripts/freebsd/harden.sh`) does most of this. Run it with `sh harden.sh` as root (after `su -`).
+> The FreeBSD script (`scripts/freebsd/harden.sh`) does most of this. Run it with `sh harden.sh` as root (after `su -`). Step [0.1 Fast path](#01-fast-path-run-the-hardening-script) shows how, and every step below says what the script already did for you.
 
 ---
 
@@ -36,12 +36,39 @@ FreeBSD may appear in the **Semifinals** (depending on tier). It's a Unix like L
 - [ ] Become root: `su -` (or `sudo -i` / `doas -s` if those are installed).
 - [ ] Answer the forensics questions ([guide](../guides/forensics-questions.md)). `sha256 file` hashes a file on FreeBSD (`sha256sum` may not exist).
 
+### 0.1 Fast path: run the hardening script
+- [ ] Done
+
+**What:** Let the script fix the easy things first, then do only the steps it leaves for you. Answer the **forensics questions first**: the script can delete files and users they ask about.
+
+**Why it matters:** The script does in a few minutes what takes an hour by hand, and its findings report is a ready-made to-do list.
+
+**Typing:** become root, get the script onto the image ([how to download it](../start-here/using-the-scripts.md)), then:
+```sh
+su -                                    # asks for the ROOT password
+cd CyberPatriot-Security-Script-main/scripts/freebsd
+sh harden.sh --audit                    # report only, changes NOTHING; read every REVIEW line
+sh harden.sh --audit --config my.conf   # optional: README info from a file (make it with the README config builder on the website)
+sh harden.sh --apply                    # now fix things (add --config my.conf if you made one)
+cat /root/cyberpatriot/findings-*.txt   # the findings report: your to-do list
+```
+The script asks for the README's admins, users and critical services first (unless you use `--config`). Type the names carefully. At the end it prints the path of the findings report (`/root/cyberpatriot/findings-<date-time>.txt`). Read it.
+
+Now skip every step marked **Script: ✅** below (on the website, press **Tick the script's ✅ steps** at the top of the page). Do the 🔎 and ✋ steps.
+
+**Check it worked:** the summary at the end shows `CHANGED` items and a `To-do list:` path, `ls /root/cyberpatriot/` shows the findings report, and the Scoring Report shows new points.
+
+> [!WARNING]
+> Any `FAILED` line means the script could not do that fix: do it by hand with the steps below. The FreeBSD script **has not been run on a real FreeBSD system yet**, so always run `--audit` first and check the Scoring Report after `--apply`. If your score goes down, undo the change from `/root/cyberpatriot/backups/`.
+
 ---
 
 ## 1. Users and groups
 
 ### 1.1 List users
 - [ ] Done
+
+**Script:** 🔎 Lists the users and reports every one that is not in your README list; you still read the list yourself.
 
 ```sh
 awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd
@@ -50,6 +77,8 @@ awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd
 ### 1.2 Delete unauthorized users, add missing ones
 - [ ] Done
 
+**Script:** 🔎 Deletes users missing from your README list and creates missing ones (it asks first, and only if you gave the user lists); double-check the names.
+
 ```sh
 pw userdel mallory              # add -r to also delete their home folder
 adduser                         # interactive: asks for name, shell, password...
@@ -57,6 +86,8 @@ adduser                         # interactive: asks for name, shell, password...
 
 ### 1.3 Admins = the `wheel` group
 - [ ] Done
+
+**Script:** 🔎 Removes non-admins from `wheel` and adds the README admins (only works if you gave AUTHORIZED_ADMINS); you still check sudo/doas rules and the `operator` group it reports.
 
 ```sh
 pw groupshow wheel
@@ -68,6 +99,8 @@ If `sudo` or `doas` is installed, also check their rules (section 7).
 ### 1.4 Hidden root accounts
 - [ ] Done
 
+**Script:** 🔎 Locks `toor` if it has a password and offers to delete any other UID-0 account; run the check again to be sure only `root` and a locked `toor` are left.
+
 ```sh
 awk -F: '$3 == 0 {print $1, $2}' /etc/master.passwd
 ```
@@ -75,6 +108,8 @@ FreeBSD normally has **`root`** and **`toor`** with UID 0. `toor` is fine **only
 
 ### 1.5 Empty passwords and weak passwords
 - [ ] Done
+
+**Script:** 🔎 Locks accounts with an empty password and sets your NEW_PASSWORD for the README users if you give one; otherwise set strong passwords yourself with `passwd`.
 
 ```sh
 awk -F: '$2 == "" {print $1}' /etc/master.passwd     # accounts with NO password
@@ -87,6 +122,8 @@ passwd bob                                           # set a strong password
 
 ### 2.1 Strong hashing and password expiry (`/etc/login.conf`)
 - [ ] Done
+
+**Script:** ✅ Done by the script (`passwords` section).
 
 ```sh
 ee /etc/login.conf
@@ -104,6 +141,8 @@ cap_mkdb /etc/login.conf
 ### 2.2 Password complexity (`pam_passwdqc`)
 - [ ] Done
 
+**Script:** ✅ Done by the script (`passwords` section).
+
 ```sh
 ee /etc/pam.d/passwd
 ```
@@ -118,6 +157,8 @@ password	requisite	pam_passwdqc.so	min=disabled,disabled,disabled,12,12 similar=
 
 ### 3.1 Write a pf ruleset
 - [ ] Done
+
+**Script:** 🔎 Writes `/etc/pf.conf` that only opens your CRITICAL_SERVICES ports (plus EXTRA_PORTS) and turns pf on, but if pf was already on it only shows the rules; check the open ports match the README.
 
 ```sh
 ee /etc/pf.conf
@@ -144,6 +185,8 @@ pfctl -sr                       # show the rules in use
 ### 4.1 See what starts at boot
 - [ ] Done
 
+**Script:** 🔎 Lists every enabled service and listening program in the findings report; you still compare them with the README.
+
 ```sh
 service -e                      # every enabled service
 sysrc -a | grep enable          # every *_enable setting
@@ -152,6 +195,8 @@ sockstat -4 -6 -l               # what's listening
 
 ### 4.2 Turn off what the README doesn't need
 - [ ] Done
+
+**Script:** 🔎 Offers to turn off common services (telnet, ftp, inetd, samba, web, databases...) that are not in CRITICAL_SERVICES; you still decide about anything else on the list.
 
 ```sh
 sysrc telnetd_enable=NO ; service telnetd onestop
@@ -162,6 +207,8 @@ Also check `/etc/inetd.conf`: any line without `#` starts a service (telnet, ftp
 
 ### 4.3 Safer defaults in `/etc/rc.conf`
 - [ ] Done
+
+**Script:** ✅ Done by the script (`services` section).
 
 ```sh
 sysrc sendmail_enable=NONE      # no mail server (unless the README needs mail)
@@ -176,6 +223,8 @@ sysrc dumpdev=NO                # no crash dumps (they contain memory, i.e. pass
 
 ### 5.1 Secure sshd_config
 - [ ] Done
+
+**Script:** 🔎 Sets the safe sshd_config values, reloads sshd and turns on blacklistd, but does not add a `Banner` or turn SSH off for you; if SSH is not critical, disable it yourself.
 
 Only if SSH is critical; otherwise `sysrc sshd_enable=NO; service sshd stop`.
 ```sh
@@ -194,6 +243,8 @@ sysrc blacklistd_enable=YES && service blacklistd start      # blocks password g
 ### 6.1 Remove prohibited packages
 - [ ] Done
 
+**Script:** 🔎 Offers to remove packages from its list of hacking tools, games, torrent and remote-access apps; you still look through `pkg info` for anything else.
+
 ```sh
 pkg info                        # everything installed
 pkg info | grep -Ei 'nmap|john|hydra|wireshark|aircrack|hashcat|nikto|sqlmap|ettercap|netcat|minetest|supertux|transmission|qbittorrent|x11vnc'
@@ -206,12 +257,16 @@ pkg autoremove -y
 ### 6.2 Known security holes
 - [ ] Done
 
+**Script:** 🔎 Runs `pkg audit -F` and lists vulnerable packages (the updates section upgrades them); check nothing is still listed afterwards.
+
 ```sh
 pkg audit -F                    # lists installed packages with known vulnerabilities
 ```
 
 ### 6.3 Updates
 - [ ] Done
+
+**Script:** 🔎 Installs `freebsd-update` and `pkg` updates in --apply if you say yes (or set FULL_UPGRADE=yes); check they finished and reboot if the kernel changed.
 
 ```sh
 freebsd-update fetch install    # OS updates (press q if a list appears)
@@ -220,6 +275,8 @@ pkg update && pkg upgrade -y    # package updates
 
 ### 6.4 Media files
 - [ ] Done
+
+**Script:** 🔎 Finds media and torrent files and offers to delete them all; check the list against the forensics questions before saying yes.
 
 ```sh
 find /home /usr/home /root /tmp -type f \( -iname '*.mp3' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.mkv' -o -iname '*.wav' -o -iname '*.flac' \)
@@ -231,6 +288,8 @@ find /home /usr/home /root /tmp -type f \( -iname '*.mp3' -o -iname '*.mp4' -o -
 
 ### 7.1 No password-less root
 - [ ] Done
+
+**Script:** 🔎 Removes `NOPASSWD`/`!authenticate` (sudo) and `nopass` (doas) and reports rules for users who are not README admins; you remove those rules yourself.
 
 ```sh
 cat /usr/local/etc/sudoers /usr/local/etc/sudoers.d/* 2>/dev/null   # edit with: visudo
@@ -244,6 +303,8 @@ Remove `NOPASSWD` (sudo) and `nopass` (doas). Only the README admins (or `%wheel
 
 ### 8.1 /etc/sysctl.conf
 - [ ] Done
+
+**Script:** 🔎 Writes every setting to `/etc/sysctl.conf` and applies most of them now; run `service sysctl restart` so `net.inet.ip.forwarding=0` takes effect too.
 
 ```
 security.bsd.see_other_uids=0
@@ -273,6 +334,8 @@ Apply right away: `service sysctl restart`. `see_other_uids=0` means users can't
 ### 9.1 Important files and SUID programs
 - [ ] Done
 
+**Script:** 🔎 Fixes the permissions on the important files and offers to remove SUID from dangerous programs; you still look up the other unusual SUID programs it reports.
+
 ```sh
 ls -l /etc/master.passwd /etc/spwd.db      # must be -rw------- root wheel
 chmod 600 /etc/master.passwd
@@ -286,6 +349,8 @@ chmod u-s /usr/bin/find                        # if find/vi/sh/python etc. are S
 
 ### 10.1 Cron, start-up scripts, shell files, keys, hosts
 - [ ] Done
+
+**Script:** 🔎 Reports cron jobs, rc.d scripts, shell aliases, SSH keys, listening programs, /etc/hosts and boot modules and offers to remove the obvious ones; you still check and fix every REVIEW line.
 
 ```sh
 ls -la /var/cron/tabs/ ; cat /var/cron/tabs/* 2>/dev/null     # every user's cron jobs
@@ -303,6 +368,8 @@ grep _load /boot/loader.conf     # modules loaded at boot
 ### 10.2 Tampered system files
 - [ ] Done
 
+**Script:** 🔎 In --apply it offers to run `freebsd-update IDS` and lists changed system files; you still decide which programs were tampered with.
+
 ```sh
 freebsd-update IDS | less        # lists system files that differ from the official release
 ```
@@ -314,6 +381,8 @@ freebsd-update IDS | less        # lists system files that differ from the offic
 
 ### 11.1 Security auditing on
 - [ ] Done
+
+**Script:** ✅ Done by the script (`logging` section).
 
 ```sh
 sysrc auditd_enable=YES && service auditd start

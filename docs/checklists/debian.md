@@ -19,15 +19,21 @@ Debian is Ubuntu's and Linux Mint's "parent", so most commands are the same as t
 ### 0.1 Read the README, take a snapshot, open the Scoring Report
 - [ ] Done
 
+**Script:** ✋ Not done by the script. Do this by hand.
+
 See [Reading the README](../start-here/reading-the-readme.md). In VMware: **VM → Snapshot → Take Snapshot**.
 
 ### 0.2 Open a terminal
 - [ ] Done
 
+**Script:** ✋ Not done by the script. Do this by hand.
+
 GNOME: press the **Super (Windows) key**, type `terminal`, press Enter.
 
 ### 0.3 Become an administrator: `sudo` or `su -`
 - [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
 
 ```bash
 sudo -v
@@ -56,6 +62,8 @@ They must **log out and back in** before `sudo` works for them.
 ### 1.1 Answer them before changing anything
 - [ ] Done
 
+**Script:** ✋ Not done by the script. Do this by hand.
+
 Same tools as [Mint section 1](linux-mint.md#1-forensics-questions-do-these-first), **except the logs:**
 ```bash
 journalctl _COMM=sshd | tail -50              # SSH logins
@@ -66,12 +74,52 @@ last -a | head -20                            # recent logins
 ```
 `/var/log/auth.log` only exists if `rsyslog` is installed.
 
+### 1.2 Fast path: run the hardening script
+- [ ] Done
+
+**What:** Once **every forensics question is answered**, run the toolkit's script `scripts/linux/harden.sh`. It fixes many of the steps below for you and gives you a to-do list for the rest.
+
+**Why it matters:** The script does in a few minutes what takes an hour by hand, and it backs up every file before changing it. That leaves you more time for the steps that need a human.
+
+**Typing:**
+1. Get the toolkit onto the image (git or ZIP download): see [Using the scripts](../start-here/using-the-scripts.md).
+2. Optional: make a config file with the README config builder on the website and save it as `my.conf` in the `scripts/linux` folder. No config? Leave out `--config my.conf` and the script asks you for the README names instead.
+3. Run it in **audit** mode first (it changes nothing) and read every `REVIEW` line. Then run it in **apply** mode:
+```bash
+cd CyberPatriot-Security-Script/scripts/linux       # or wherever you unzipped it
+sudo bash harden.sh --audit --config my.conf        # report only: read the REVIEW lines
+sudo bash harden.sh --apply --config my.conf        # make the changes (it asks before risky ones)
+sudo cat /root/cyberpatriot/findings-*.txt          # your to-do list: every REVIEW item
+```
+
+**`sudo` doesn't work yet (step 0.3)?** Use `su -` and leave out `sudo`. `su -` takes you to root's home folder, so `cd` back to the script first:
+```bash
+su -                                                # asks for ROOT's password
+cd /home/alice/Downloads/CyberPatriot-Security-Script-main/scripts/linux   # your user's folder
+bash harden.sh --apply --config my.conf
+```
+Run this way, the script can't tell who you are, so make sure **your own account** is in the README admin list you give it. It also won't lock root (see step 2.6).
+
+**Check it worked:** The summary at the end shows mostly `OK` and `CHANGED`. Refresh the **Scoring Report**: your score should have gone up.
+
+Every step below has a **Script:** line:
+- **✅** the script does the whole step.
+- **🔎** the script does part of it or only reports it. Finish it yourself.
+- **✋** the script doesn't do it. Do it by hand.
+
+Now skip every step marked **Script: ✅** below (on the website, press **Tick the script's ✅ steps** at the top of the page). Do the 🔎 and ✋ steps.
+
+> [!WARNING]
+> If any line says `FAILED`, do that step by hand. If your score goes **down**, find the change that caused it and undo it from the backups in `/root/cyberpatriot/backups/` (see [Using the scripts](../start-here/using-the-scripts.md#undoing-a-change)).
+
 ---
 
 ## 2. Users and groups
 
 ### 2.1 List users
 - [ ] Done
+
+**Script:** 🔎 The script shows the users on this machine and flags every one that isn't in the README; you still type the README names in correctly.
 
 **Clicking (GNOME):** **Settings → Users** → click **Unlock** (top right) and enter a password.
 
@@ -83,6 +131,8 @@ awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd
 ### 2.2 Delete users who are not in the README
 - [ ] Done
 
+**Script:** ✅ Done by the script (`users` section).
+
 **Clicking:** **Settings → Users** → **Unlock** → click the user → **Remove User…**
 
 **Typing:**
@@ -93,12 +143,16 @@ sudo deluser mallory              # or as root: deluser mallory
 ### 2.3 Add missing users
 - [ ] Done
 
+**Script:** 🔎 The script creates missing README users (and makes README admins administrators), but they only get a password if you give it one (NEW_PASSWORD or when asked).
+
 ```bash
 sudo adduser erin
 ```
 
 ### 2.4 Fix administrators (the `sudo` group)
 - [ ] Done
+
+**Script:** ✅ Done by the script (`users` section).
 
 **Clicking:** **Settings → Users** → click the user → toggle **Administrator**.
 
@@ -112,10 +166,14 @@ sudo usermod -aG sudo alice
 ### 2.5 Hidden root accounts, hidden users, powerful groups, weak passwords
 - [ ] Done
 
+**Script:** 🔎 The script handles much of Mint 2.5–2.7 but asks you about hidden users and only sets passwords if you give one; follow the tags on those Mint steps.
+
 Same as [Mint 2.5 – 2.7](linux-mint.md#25-look-for-hidden-root-accounts-and-hidden-users).
 
 ### 2.6 The root account
 - [ ] Done
+
+**Script:** 🔎 The script locks root only if you ran it with `sudo` from an admin account; if you still need `su -`, give root a strong password yourself.
 
 On Debian, **root may have a password** (Mint and Ubuntu lock it).
 ```bash
@@ -131,6 +189,8 @@ sudo passwd -S root       # P = has a password, L = locked
 ### 3.1 Same as Mint
 - [ ] Done
 
+**Script:** 🔎 The script does Mint 3.1–3.5 (and installs `libpam-pwquality`), but lockout (3.6) only if ENABLE_LOCKOUT=yes or you answer yes.
+
 Follow [Mint section 3](linux-mint.md#3-password-and-lockout-policy). Debian 12 has `pam_faillock`, and its `common-auth` has the same layout (including the comment line between `pam_unix` and `pam_deny`, which is why the order in Mint 3.6 matters).
 
 `libpam-pwquality` isn't installed by default:
@@ -144,6 +204,8 @@ sudo apt install libpam-pwquality
 
 ### 4.1 Install and turn on UFW
 - [ ] Done
+
+**Script:** 🔎 The script installs and turns on UFW and opens ports for the critical services you entered; check `sudo ufw status verbose` matches the README.
 
 **Why:** Debian ships **without** a firewall turned on.
 
@@ -165,6 +227,8 @@ Prefer clicking? `sudo apt install gufw`, then open **Firewall Configuration**.
 ### 5.1 Check the software sources
 - [ ] Done
 
+**Script:** 🔎 The script flags unofficial sources, `[trusted=yes]` and a missing security source under REVIEW; you remove the bad ones.
+
 ```bash
 cat /etc/apt/sources.list; ls /etc/apt/sources.list.d/
 ```
@@ -172,6 +236,8 @@ For Debian 12 you should see **`deb.debian.org/debian bookworm`**, **`bookworm-u
 
 ### 5.2 Install all updates
 - [ ] Done
+
+**Script:** 🔎 The script installs all updates only if FULL_UPGRADE=yes or you say yes when asked; otherwise do it here.
 
 ```bash
 sudo apt update
@@ -182,6 +248,8 @@ sudo apt full-upgrade -y
 ### 5.3 Turn on automatic updates
 - [ ] Done
 
+**Script:** ✅ Done by the script (`updates` section).
+
 ```bash
 sudo apt install unattended-upgrades
 sudo dpkg-reconfigure -plow unattended-upgrades       # answer Yes
@@ -190,6 +258,8 @@ cat /etc/apt/apt.conf.d/20auto-upgrades               # both lines should be "1"
 
 ### 5.4 Held packages
 - [ ] Done
+
+**Script:** ✅ Done by the script (`updates` section).
 
 ```bash
 apt-mark showhold; sudo apt-mark unhold <name>
@@ -202,10 +272,14 @@ apt-mark showhold; sudo apt-mark unhold <name>
 ### 6.1 GNOME "Sharing" settings
 - [ ] Done
 
+**Script:** 🔎 The script can stop SSH, VNC and Samba if the README doesn't need them, but it doesn't change GNOME's Sharing settings; turn those off here.
+
 **Clicking:** **Settings → Sharing** (GNOME 43: **Settings → System → Sharing** on newer versions). Turn **off** anything the README doesn't need: **Remote Desktop / Screen Sharing**, **Remote Login** (that's SSH), **File Sharing**, **Media Sharing**.
 
 ### 6.2 Turn off services that aren't needed
 - [ ] Done
+
+**Script:** 🔎 The script offers to stop (or remove) known services the README doesn't list; SSH, uninstalling, and services it doesn't know about are your call.
 
 Same table and commands as [Mint section 6](linux-mint.md#6-services):
 ```bash
@@ -222,6 +296,8 @@ sudo apt purge <package>
 ### 7.1 Same as Mint
 - [ ] Done
 
+**Script:** 🔎 The script removes known prohibited packages (including GNOME games) and lists files under REVIEW; follow the tags on the Mint section 7 steps.
+
 Follow [Mint section 7](linux-mint.md#7-prohibited-software-and-files). Debian's GNOME install can include games (`gnome-games`, `aisleriot`, `gnome-mines`, `gnome-sudoku`…):
 ```bash
 dpkg -l | grep -Ei 'gnome-games|aisleriot|mines|sudoku|mahjongg|chess|robots|tetravex|nibbles|klotski|quadrapassel|swell-foop|tali|four-in-a-row|five-or-more|hitori|iagno|lightsoff'
@@ -234,6 +310,8 @@ sudo apt purge gnome-games && sudo apt autoremove
 
 ### 8.1 No automatic login (GDM)
 - [ ] Done
+
+**Script:** ✅ Done by the script (`desktop` section).
 
 **Clicking:** **Settings → Users** → **Unlock** → turn off **Automatic Login** for every user.
 
@@ -250,6 +328,8 @@ In `[security]`: `DisallowTCP=true`.
 
 ### 8.2 Screen lock
 - [ ] Done
+
+**Script:** 🔎 The script sets a 5-minute screen lock for all users with dconf; run the `gsettings` check, and set it by hand if the script says REVIEW.
 
 **Clicking:** **Settings → Privacy (& Security) → Screen Lock**: **Automatic Screen Lock: On**, **Automatic Screen Lock Delay: Screen Turns Off**. Then **Settings → Power → Screen Blank: 5 minutes**.
 
@@ -278,6 +358,8 @@ These are the same on Debian. Follow the Mint sections:
 ### 10.1 Install rsyslog and auditd
 - [ ] Done
 
+**Script:** ✅ Done by the script (`logging` section).
+
 **Why:** Without `rsyslog`, there's no `/var/log/auth.log`. Many people (and some scoring checks) expect it.
 ```bash
 sudo apt install rsyslog auditd
@@ -287,6 +369,8 @@ Audit rules: same as [Mint 14.1](linux-mint.md#14-logging-and-auditing).
 
 ### 10.2 AppArmor
 - [ ] Done
+
+**Script:** ✅ Done by the script (`apparmor` section).
 
 Debian has AppArmor turned on by default. Check it's still on: `sudo aa-status`.
 

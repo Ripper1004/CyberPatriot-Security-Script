@@ -1,14 +1,18 @@
 ---
 // Shown under the title of every checklist: which rounds use this OS, the
 // matching script, and the progress card with its controls.
-import { checklistById, roundsFor, SCRIPTS } from '../data/site';
+import { checklistById, checklistSteps, roundsFor, SCRIPTS } from '../data/site';
 
 interface Props {
   id: string;
   page: string;
-  total: number;
 }
-const { id, page, total } = Astro.props;
+const { id, page } = Astro.props;
+const steps = checklistSteps[page]?.steps ?? [];
+const total = steps.length;
+const count = (k: string) => steps.filter((s) => s.script === k).length;
+const tags = { auto: count('auto'), review: count('review'), manual: count('manual') };
+const fastPath = steps.find((s) => /fast path/i.test(s.title));
 const checklist = checklistById(id);
 const rounds = checklist ? roundsFor(checklist.image) : [];
 const script = SCRIPTS.find((s) => s.id === checklist?.script);
@@ -59,6 +63,25 @@ const script = SCRIPTS.find((s) => s.id === checklist?.script);
   >
     <span class="cp-bar__fill" style="width:0%"></span>
   </div>
+  {
+    tags.auto > 0 && (
+      <div class="cp-script-key">
+        <p class="cp-script-key__text">
+          <strong>Using the script?</strong> Run it at{' '}
+          {fastPath ? <a href={`#${fastPath.id}`}>step {fastPath.title.split(' ')[0]}</a> : 'the start'}, then tick its steps
+          and work on the rest.
+        </p>
+        <ul class="cp-script-key__legend" aria-label="What the script does">
+          <li><span aria-hidden="true">✅</span> {tags.auto} done by the script</li>
+          <li><span aria-hidden="true">🔎</span> {tags.review} the script checks, you decide</li>
+          <li><span aria-hidden="true">✋</span> {tags.manual} by hand</li>
+        </ul>
+        <button type="button" class="cp-btn cp-btn--sm" data-cp-action="script">
+          Tick the script's ✅ steps
+        </button>
+      </div>
+    )
+  }
   <div class="cp-progress__actions">
     <button type="button" class="cp-btn cp-btn--primary cp-btn--sm" data-cp-action="next">Go to next step ↓</button>
     <button type="button" class="cp-btn cp-btn--sm" data-cp-action="hide" aria-pressed="false">Hide finished steps</button>

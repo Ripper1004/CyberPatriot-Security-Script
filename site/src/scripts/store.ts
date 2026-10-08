@@ -57,6 +57,17 @@ export function setStepDone(page: string, step: string, done: boolean): void {
   touch(page);
 }
 
+/** Ticks (or unticks) several steps in one go. */
+export function setStepsDone(page: string, steps: string[], done: boolean): void {
+  const set = getDoneSteps(page);
+  for (const step of steps) {
+    if (done) set.add(step);
+    else set.delete(step);
+  }
+  write(`steps:${page}`, set.size ? [...set] : null);
+  touch(page);
+}
+
 export function resetSteps(page: string): void {
   write(`steps:${page}`, null);
 }

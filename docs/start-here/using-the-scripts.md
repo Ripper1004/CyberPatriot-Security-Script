@@ -136,3 +136,7 @@ sh harden.sh
 2. **Audit before Apply.** Read the REVIEW items.
 3. **Check the Scoring Report** after running Apply. If the score went **down**, find the change that caused it (the log has a timestamp for every change) and undo it from the backups.
 4. The script is a starting point. **Use the checklist** for everything it marks REVIEW and for things scripts can't detect.
+5. **Every checklist step is tagged** with what the script does for it:
+   - **Script: ✅** the script does it. After a clean Apply run you can skip it. On the website, **Tick the script's ✅ steps** ticks them all at once.
+   - **Script: 🔎** the script checks it and lists it under REVIEW, but you decide.
+   - **Script: ✋** the script doesn't do it. Do it by hand.

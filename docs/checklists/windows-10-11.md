@@ -6,7 +6,7 @@ Windows 11 is in **Round 1 and Round 2** this season. Windows 10 is the same exc
 - Work **top to bottom**.
 - Each item has: **What** · **Why it matters** · **Clicking** · **Typing** (PowerShell **as Administrator**) · **Check it worked** · ⚠️ warnings.
 - New to PowerShell? Read [PowerShell basics](../start-here/powershell-basics.md) first.
-- The script `scripts/windows/Harden.ps1` does most of this automatically. See [Using the scripts](../start-here/using-the-scripts.md).
+- The script `scripts/windows/Harden.ps1` does much of this automatically. Run it at [step 1.2](#12-fast-path-run-the-hardening-script) (after forensics), then skip every step marked **Script: ✅**. See [Using the scripts](../start-here/using-the-scripts.md).
 - `alice`, `bob` etc. are examples. **Use the names in your README.**
 
 ---
@@ -16,20 +16,28 @@ Windows 11 is in **Round 1 and Round 2** this season. Windows 10 is the same exc
 ### 0.1 Read the README
 - [ ] Done
 
+**Script:** ✋ Not done by the script. Do this by hand.
+
 Write down the admins, users, critical services, required software and prohibited items. See [Reading the README](../start-here/reading-the-readme.md).
 
 ### 0.2 Take a VMware snapshot
 - [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
 
 **VM → Snapshot → Take Snapshot…**
 
 ### 0.3 Open PowerShell as Administrator
 - [ ] Done
 
+**Script:** ✋ Not done by the script. Do this by hand.
+
 **Start** → type `powershell` → **Run as administrator**. The title must say **Administrator**.
 
 ### 0.4 Open the Scoring Report
 - [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
 
 Double-click it on the desktop and refresh it as you work.
 
@@ -39,6 +47,8 @@ Double-click it on the desktop and refresh it as you work.
 
 ### 1.1 Answer every forensics question before fixing things
 - [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
 
 Open each `Forensics Question N.txt` on the desktop, put your answer after `ANSWER:`, and save.
 
@@ -51,12 +61,44 @@ Select-String -Path C:\Users\*\Documents\* -Pattern "password"     # find text i
 ```
 More: [Forensics questions guide](../guides/forensics-questions.md).
 
+### 1.2 Fast path: run the hardening script
+- [ ] Done
+
+**What:** Run `Harden.ps1` **only after every forensics question is answered**. It fixes many of the steps on this page for you and writes the rest into a to-do list.
+
+**Why it matters:** The script does in minutes what takes an hour by hand. But it deletes users and files, and that can destroy the evidence a forensics question asks about.
+
+1. Get the script onto the image: see [Using the scripts](../start-here/using-the-scripts.md).
+2. Optional: make a config file with the README config builder on the website and save it as `my-readme.psd1` next to `Harden.ps1`. Without a config file, the script asks you for the README names instead.
+3. Open PowerShell as Administrator (step 0.3) and `cd` into the folder that holds `Harden.ps1`.
+4. Run it in **Audit** mode first. Audit changes nothing. Read every `REVIEW` line.
+5. Run it in **Apply** mode. Answer its questions using the README.
+
+**Typing:**
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Harden.ps1 -Mode Audit -Config .\my-readme.psd1
+powershell -ExecutionPolicy Bypass -File .\Harden.ps1 -Mode Apply -Config .\my-readme.psd1
+Get-ChildItem C:\harden-toolkit\findings-*.txt      # your to-do lists, newest last
+notepad (Get-ChildItem C:\harden-toolkit\findings-*.txt | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
+```
+
+**Check it worked:** Read the newest `C:\harden-toolkit\findings-*.txt`: every line in it is a job for you. Refresh the Scoring Report: the score should have gone up.
+
+Now skip every step marked **Script: ✅** below (on the website, press **Tick the script's ✅ steps** at the top of the page). Do the 🔎 and ✋ steps.
+
+> [!WARNING]
+> - Any `FAILED` line in the summary means the script could not do it. Do that step by hand with this checklist.
+> - If the Scoring Report score **drops**, find the change in the log and undo it from `C:\harden-toolkit\backups\` (see [Using the scripts](../start-here/using-the-scripts.md)).
+> - The Windows script **hasn't been tested on a real Windows competition image yet**. Always run Audit first and read what it plans to change.
+
 ---
 
 ## 2. Users and groups
 
 ### 2.1 List every user
 - [ ] Done
+
+**Script:** 🔎 The script compares every user with your README list and flags the extras, but look at the list yourself so you know who is on the computer.
 
 **Clicking:** **Win + R** → `lusrmgr.msc` → **Users**. (Or **Settings → Accounts → Other users**.)
 
@@ -67,6 +109,8 @@ Get-LocalUser | Format-Table Name, Enabled, PasswordRequired, PasswordExpires, L
 
 ### 2.2 Delete users who are not in the README
 - [ ] Done
+
+**Script:** ✅ Done by the script (`users` section).
 
 **Why it matters:** Extra accounts are how attackers get back in.
 
@@ -83,6 +127,8 @@ Remove-LocalUser -Name mallory
 ### 2.3 Create users the README says should exist
 - [ ] Done
 
+**Script:** ✅ Done by the script (`users` section).
+
 **Clicking:** `lusrmgr.msc` → **Users** → **Action → New User…** → untick "User must change password" only if the README says so.
 
 **Typing:**
@@ -93,6 +139,8 @@ Add-LocalGroupMember -Group Users -Member erin
 
 ### 2.4 Fix the Administrators group
 - [ ] Done
+
+**Script:** ✅ Done by the script (`users` section).
 
 **What:** Only the README's admins should be in **Administrators**.
 
@@ -108,6 +156,8 @@ Add-LocalGroupMember -Group Administrators -Member alice
 ### 2.5 Check the other powerful groups
 - [ ] Done
 
+**Script:** 🔎 The script lists everyone in these groups and offers to remove them; say no for anyone the README puts there on purpose (e.g. Remote Desktop Users when RDP is needed).
+
 Open these groups in `lusrmgr.msc` and remove anyone the README doesn't say should be there:
 **Backup Operators** (can read every file), **Power Users**, **Remote Desktop Users** (keep only if RDP is needed), **Remote Management Users**, **Hyper-V Administrators**, **Event Log Readers**, **Network Configuration Operators**.
 
@@ -118,6 +168,8 @@ foreach ($g in 'Backup Operators','Power Users','Remote Desktop Users','Remote M
 
 ### 2.6 Disable the Guest account (and the other built-ins)
 - [ ] Done
+
+**Script:** 🔎 The script disables Guest, DefaultAccount and WDAGUtilityAccount, but only asks about the built-in Administrator (default No), so you decide that one.
 
 **Clicking:** `lusrmgr.msc` → **Users** → right-click **Guest** → **Properties** → tick **Account is disabled**.
 
@@ -130,6 +182,8 @@ The built-in **Administrator** should usually be disabled too, **unless you're l
 
 ### 2.7 Fix weak password settings on accounts
 - [ ] Done
+
+**Script:** ✅ Done by the script (`users` section).
 
 **What:** No account should have **Password never expires**, **User cannot change password**, or *no password required*.
 
@@ -144,6 +198,8 @@ net user bob /passwordreq:yes
 
 ### 2.8 Give users strong passwords
 - [ ] Done
+
+**Script:** 🔎 The script sets one strong password for every README user except you only if you put NewPassword in the config or type one when asked; otherwise set them by hand.
 
 **Clicking:** `lusrmgr.msc` → right-click the user → **Set Password…**
 
@@ -162,6 +218,8 @@ Use 12+ characters with upper case, lower case, a number and a symbol. **Don't c
 ### 3.1 Password Policy
 - [ ] Done
 
+**Script:** ✅ Done by the script (`passwords` section).
+
 | Setting | Set to |
 |---|---|
 | Enforce password history | **24** passwords remembered |
@@ -178,6 +236,8 @@ net accounts /uniquepw:24 /maxpwage:90 /minpwage:1 /minpwlen:12
 
 ### 3.2 Account Lockout Policy
 - [ ] Done
+
+**Script:** 🔎 The script sets threshold 5, duration 30 and reset 30 (unless EnableLockout is 'no'); set "Allow Administrator account lockout" yourself.
 
 | Setting | Set to |
 |---|---|
@@ -198,6 +258,8 @@ net accounts                     # check everything
 ### 4.1 Audit Policy (record security events)
 - [ ] Done
 
+**Script:** ✅ Done by the script (`audit` section).
+
 **Why:** Without auditing there's no record of logins, account changes, or policy changes.
 
 **Clicking:** `secpol.msc` → **Local Policies → Audit Policy**. Set **every** item to **Success and Failure**.
@@ -211,6 +273,8 @@ Also: **Security Options → Audit: Force audit policy subcategory settings… t
 
 ### 4.2 User Rights Assignment
 - [ ] Done
+
+**Script:** 🔎 The script removes Everyone, Users, Guests and non-admin accounts from the powerful rights and makes sure Guests are denied; still compare every right with the table.
 
 **Clicking:** `secpol.msc` → **Local Policies → User Rights Assignment**. Double-click a right to see who has it.
 
@@ -236,6 +300,8 @@ Also: **Security Options → Audit: Force audit policy subcategory settings… t
 
 ### 4.3 Security Options
 - [ ] Done
+
+**Script:** ✅ Done by the script (`security` section).
 
 **Clicking:** `secpol.msc` → **Local Policies → Security Options**.
 
@@ -270,6 +336,8 @@ Also: **Security Options → Audit: Force audit policy subcategory settings… t
 ### 5.1 Turn every protection on
 - [ ] Done
 
+**Script:** 🔎 The script turns on real-time, cloud, sample submission and PUA protection; turn on Tamper Protection yourself (scripts can't).
+
 **Clicking:** **Start → Windows Security → Virus & threat protection → Manage settings**. Turn **on**: Real-time protection, Cloud-delivered protection, Automatic sample submission, **Tamper Protection**.
 
 **Typing:**
@@ -280,6 +348,8 @@ Set-MpPreference -DisableRealtimeMonitoring $false -PUAProtection Enabled -MAPSR
 
 ### 5.2 Remove planted exclusions
 - [ ] Done
+
+**Script:** ✅ Done by the script (`defender` section).
 
 **Why:** Attackers tell Defender to ignore their folder.
 
@@ -294,10 +364,14 @@ Remove-MpPreference -ExclusionPath "C:\Users\Public\tools"
 ### 5.3 No policy that turns Defender off
 - [ ] Done
 
+**Script:** 🔎 The script deletes the registry values that turn Defender off, but a setting made in gpedit.msc can come back; still check gpedit.msc says Not configured.
+
 **Clicking:** **Win + R** → `gpedit.msc` → **Computer Configuration → Administrative Templates → Windows Components → Microsoft Defender Antivirus** → **Turn off Microsoft Defender Antivirus** must be **Not configured** (or Disabled). Check **Real-time Protection** in the same place.
 
 ### 5.4 Update and scan
 - [ ] Done
+
+**Script:** 🔎 The script updates the virus definitions but doesn't scan; run the Quick Scan and Get-MpThreatDetection yourself.
 
 ```powershell
 Update-MpSignature
@@ -312,6 +386,8 @@ Get-MpThreatDetection           # anything found
 ### 6.1 Firewall on for every network type
 - [ ] Done
 
+**Script:** ✅ Done by the script (`firewall` section).
+
 **Clicking:** **Windows Security → Firewall & network protection**. **Domain**, **Private** and **Public** must all say *Firewall is on*.
 
 **Typing:**
@@ -322,6 +398,8 @@ Get-NetFirewallProfile | Format-Table Name, Enabled, DefaultInboundAction
 
 ### 6.2 Check the inbound rules
 - [ ] Done
+
+**Script:** 🔎 The script lists custom inbound allow rules and offers to disable the suspicious ones; you decide about the rest using the README.
 
 **Clicking:** **Win + R** → `wf.msc` → **Inbound Rules**. Sort by **Enabled**. Look for **allow** rules for strange programs (in `C:\Users\`, `C:\Temp`), strange ports (4444, 1337), or rules called something like "Windows Update Helper" that point at an odd program.
 
@@ -339,10 +417,14 @@ Disable-NetFirewallRule -DisplayName "Evil Rule"
 ### 7.1 Install all updates
 - [ ] Done
 
+**Script:** 🔎 The script installs Windows updates only if InstallUpdates is 'yes' (or you answer yes); otherwise use Settings → Windows Update, and check nothing is left.
+
 **Clicking:** **Settings → Windows Update → Check for updates** → install everything. If updates are **paused**, click **Resume updates**.
 
 ### 7.2 Automatic updates on
 - [ ] Done
+
+**Script:** 🔎 The script sets automatic updates to option 4, removes update blocks and pauses, and re-enables the service; if updates were switched off in gpedit.msc, fix it there too.
 
 **Clicking:** `gpedit.msc` → **Computer Configuration → Administrative Templates → Windows Components → Windows Update** (on Windows 11: **→ Manage end user experience**) → **Configure Automatic Updates** → **Enabled**, option **4 – Auto download and schedule the install**.
 
@@ -355,6 +437,8 @@ Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -E
 
 ### 7.3 Update the other programs
 - [ ] Done
+
+**Script:** 🔎 The script only reminds you to update Chrome and Firefox; update them and every program the README lists by hand.
 
 Firefox (**≡ → Help → About Firefox**), Chrome (**⋮ → Help → About Google Chrome**), and anything the README lists (e.g. Notepad++, 7-Zip, VLC). Old versions are a scored problem.
 
@@ -372,6 +456,8 @@ Set-Service -Name RemoteRegistry -StartupType Disabled
 
 ### 8.1 Turn off risky services (unless the README needs them)
 - [ ] Done
+
+**Script:** 🔎 The script disables risky services the README doesn't list (asks first; Remote Desktop, SSH and WinRM default to No); decide those and check the table.
 
 | Service (name) | Usually |
 |---|---|
@@ -392,6 +478,8 @@ Set-Service -Name RemoteRegistry -StartupType Disabled
 ### 8.2 Make sure the security services are running
 - [ ] Done
 
+**Script:** ✅ Done by the script (`services` section).
+
 Windows Defender (`WinDefend`), Windows Defender Firewall (`mpssvc`), Windows Event Log (`EventLog`), Windows Update (`wuauserv`, Manual is fine), Security Center (`wscsvc`). None of these may be **Disabled**.
 
 ---
@@ -400,6 +488,8 @@ Windows Defender (`WinDefend`), Windows Defender Firewall (`mpssvc`), Windows Ev
 
 ### 9.1 Turn off old, insecure features
 - [ ] Done
+
+**Script:** 🔎 The script turns off SMBv1, Telnet, TFTP, PowerShell 2.0 and IE 11 (asks first) but asks about IIS with default No; decide IIS from the README.
 
 **Clicking:** **Win + R** → `optionalfeatures` → **untick**:
 - **SMB 1.0/CIFS File Sharing Support** (the WannaCry hole)
@@ -424,10 +514,14 @@ Get-WindowsOptionalFeature -Online | Where-Object State -eq Enabled | Select-Obj
 ### 10.1 Remote Assistance off
 - [ ] Done
 
+**Script:** ✅ Done by the script (`remote` section).
+
 **Clicking:** **Win + R** → `SystemPropertiesRemote` → untick **Allow Remote Assistance connections to this computer**.
 
 ### 10.2 Remote Desktop off (or secured)
 - [ ] Done
+
+**Script:** 🔎 The script keeps Remote Desktop on with NLA if your config lists rdp, otherwise turns it off (asks first); still check who is in Remote Desktop Users.
 
 **Not needed:** **Settings → System → Remote Desktop → Off**.
 
@@ -439,6 +533,8 @@ Get-WindowsOptionalFeature -Online | Where-Object State -eq Enabled | Select-Obj
 
 ### 11.1 Remove shares that aren't needed
 - [ ] Done
+
+**Script:** 🔎 The script lists every non-built-in share and offers to remove it (if the README lists file sharing it only removes Everyone's write access); decide which shares the README needs.
 
 **Clicking:** **Win + R** → `fsmgmt.msc` → **Shares**. Right-click a share → **Stop Sharing**.
 
@@ -457,6 +553,8 @@ Remove-SmbShare -Name Secret -Force
 ### 12.1 Uninstall hacking tools, games, torrent and remote-control programs
 - [ ] Done
 
+**Script:** 🔎 The script finds and uninstalls known prohibited programs by name (asks first); still read the whole installed-apps list for ones it doesn't recognise.
+
 **Clicking:** **Settings → Apps → Installed apps** (or **Win + R → appwiz.cpl**). Sort by name and read the **whole** list.
 
 Look for:
@@ -474,6 +572,8 @@ Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*, HK
 ### 12.2 Store apps and games
 - [ ] Done
 
+**Script:** 🔎 The script removes known game Store apps (asks first); check the Store app list for others.
+
 ```powershell
 Get-AppxPackage -AllUsers | Where-Object Name -match 'Solitaire|CandyCrush|Minecraft|Roblox|king.com' | Select-Object Name
 Get-AppxPackage -AllUsers *Solitaire* | Remove-AppxPackage -AllUsers
@@ -481,6 +581,8 @@ Get-AppxPackage -AllUsers *Solitaire* | Remove-AppxPackage -AllUsers
 
 ### 12.3 "Portable" tools that aren't installed
 - [ ] Done
+
+**Script:** 🔎 The script finds common tool files by name (nc.exe, mimikatz…) and offers to delete them; look in the folders above for renamed ones.
 
 Hacking tools are often just an `.exe` sitting in a folder: look in **Downloads**, **Desktop**, `C:\Users\Public`, `C:\Temp`, and `C:\` itself.
 ```powershell
@@ -494,10 +596,14 @@ Get-ChildItem C:\Users, C:\Temp -Recurse -Force -Include nc.exe,ncat.exe,nmap.ex
 ### 13.1 Show hidden files first
 - [ ] Done
 
+**Script:** 🔎 The script turns on file name extensions for your account only; turn on Hidden items yourself.
+
 **File Explorer → View → Show → Hidden items** (Windows 10: **View → Hidden items**). Also tick **File name extensions**.
 
 ### 13.2 Find media files
 - [ ] Done
+
+**Script:** 🔎 The script finds media and .torrent files and deletes all of them if you say yes; check the list first (forensics, README-allowed files) and empty the Recycle Bin yourself.
 
 ```powershell
 Get-ChildItem C:\Users -Recurse -Force -Include *.mp3,*.mp4,*.wav,*.wma,*.wmv,*.avi,*.mkv,*.mov,*.flac,*.m4a,*.aac,*.ogg,*.torrent -ErrorAction SilentlyContinue |
@@ -509,6 +615,8 @@ Also look in other folders on `C:\` that aren't part of Windows (e.g. `C:\Media`
 ### 13.3 Password lists and other data
 - [ ] Done
 
+**Script:** 🔎 The script lists password lists, captures and similar files (default No to deleting); open each one and decide.
+
 ```powershell
 Get-ChildItem C:\Users -Recurse -Force -Include *password*,*creditcard*,*.pcap,*.kdbx -ErrorAction SilentlyContinue | Select-Object FullName
 ```
@@ -519,6 +627,8 @@ Get-ChildItem C:\Users -Recurse -Force -Include *password*,*creditcard*,*.pcap,*
 
 ### 14.1 Programs that start at logon
 - [ ] Done
+
+**Script:** 🔎 The script lists every startup entry and offers to delete the suspicious ones; check the rest yourself.
 
 **Clicking:** **Task Manager (Ctrl+Shift+Esc) → Startup apps**. Also open these folders with **Win + R**: `shell:startup` and `shell:common startup`.
 
@@ -533,6 +643,8 @@ Red flags: `powershell -enc ...`, `-WindowStyle Hidden`, `nc.exe`, `mshta`, `.vb
 ### 14.2 Scheduled tasks
 - [ ] Done
 
+**Script:** 🔎 The script deletes suspicious scheduled tasks (asks first) and lists every non-Microsoft task; check that list yourself.
+
 **Clicking:** **Win + R** → `taskschd.msc` → **Task Scheduler Library**. Check each task's **Actions** tab. Non-Microsoft tasks are usually in the top folder.
 
 **Typing:**
@@ -545,12 +657,16 @@ Unregister-ScheduledTask -TaskName "BadTask" -Confirm:$false
 ### 14.3 Services that run strange programs
 - [ ] Done
 
+**Script:** 🔎 The script stops services that run from odd folders (asks first) and lists the others; check that list yourself.
+
 ```powershell
 Get-CimInstance Win32_Service | Where-Object { $_.PathName -notmatch 'Windows\\|Program Files' } | Format-Table Name, State, PathName -AutoSize
 ```
 
 ### 14.4 Sticky Keys / Utility Manager backdoor
 - [ ] Done
+
+**Script:** 🔎 The script removes Debugger hijacks and runs sfc on replaced tools (asks first); run the check commands above to confirm.
 
 **Why:** Replacing `sethc.exe` (press Shift 5 times) or `utilman.exe` (the accessibility button) with `cmd.exe` gives anyone a SYSTEM command prompt **at the login screen**.
 
@@ -564,6 +680,8 @@ Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Exe
 ### 14.5 The hosts file
 - [ ] Done
 
+**Script:** 🔎 The script comments out every unusual hosts line (asks first); if the Scoring Report doesn't give the points, delete those lines completely.
+
 ```powershell
 notepad C:\Windows\System32\drivers\etc\hosts
 ```
@@ -571,6 +689,8 @@ Only comment lines (starting with `#`) are normal. Delete lines that send real w
 
 ### 14.6 Programs listening for connections
 - [ ] Done
+
+**Script:** 🔎 The script lists listening ports and offers to stop netcat, PowerShell, Python and similar listeners; compare the list with the README and find what starts them.
 
 ```powershell
 Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess, @{n='Process';e={(Get-Process -Id $_.OwningProcess).ProcessName}} | Sort-Object LocalPort
@@ -584,25 +704,35 @@ Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess, @{n
 ### 15.1 User Account Control
 - [ ] Done
 
+**Script:** ✅ Done by the script (`security` section).
+
 **Start** → type **Change User Account Control settings** → move the slider to the **top** (**Always notify**).
 
 ### 15.2 AutoPlay off
 - [ ] Done
+
+**Script:** 🔎 The script turns AutoRun and AutoPlay off for all drives by policy; also switch the Settings toggle off.
 
 **Settings → Bluetooth & devices → AutoPlay** (Windows 10: **Devices → AutoPlay**) → **Use AutoPlay for all media and devices: Off**.
 
 ### 15.3 Screen saver with password
 - [ ] Done
 
+**Script:** 🔎 The script turns on a password-protected 10-minute screen saver by policy for logged-in accounts but doesn't pick a screen saver; pick one in Settings.
+
 **Settings → Personalization → Lock screen → Screen saver** → pick one, **Wait: 10 minutes**, tick **On resume, display logon screen**.
 
 ### 15.4 Turn off LLMNR
 - [ ] Done
 
+**Script:** ✅ Done by the script (`misc` section).
+
 `gpedit.msc` → **Computer Configuration → Administrative Templates → Network → DNS Client → Turn off multicast name resolution → Enabled**.
 
 ### 15.5 SmartScreen on
 - [ ] Done
+
+**Script:** 🔎 The script turns on SmartScreen for apps and files, for Edge, and PUA blocking; turn on the remaining switches (e.g. phishing protection, Store apps) by hand.
 
 **Windows Security → App & browser control → Reputation-based protection settings** → turn everything **on**.
 
@@ -616,10 +746,14 @@ Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess, @{n
 ### 16.1 Microsoft Edge
 - [ ] Done
 
+**Script:** ✅ Done by the script (`browsers` section).
+
 **⋯ → Settings → Privacy, search, and services** → **Microsoft Defender SmartScreen: On**, **Block potentially unwanted apps: On**. **Cookies and site permissions → Pop-ups and redirects → Block**.
 
 ### 16.2 Firefox (if installed)
 - [ ] Done
+
+**Script:** 🔎 The script sets pop-up blocking, no add-on installs, HTTPS-Only and safe browsing by policy; still update Firefox, check the add-ons and tick any remaining boxes.
 
 **≡ → Settings → Privacy & Security**:
 - **Block pop-up windows** ✔
@@ -631,6 +765,8 @@ Then **≡ → Help → About Firefox** to update. Also check **Add-ons and them
 
 ### 16.3 Chrome (if installed)
 - [ ] Done
+
+**Script:** 🔎 The script turns on Safe Browsing and pop-up blocking by policy; update Chrome yourself (Help → About Google Chrome).
 
 **⋮ → Settings → Privacy and security → Security → Standard (or Enhanced) protection**. **Site settings → Pop-ups and redirects → Don't allow**. Update via **Help → About Google Chrome**.
 

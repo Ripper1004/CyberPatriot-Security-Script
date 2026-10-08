@@ -230,6 +230,7 @@ So the checklists still read well on GitHub, and editing `docs/` updates the web
   - "Go to next step" and "Hide finished steps"
   - "Reset for a new image"
   - Print with tick boxes
+- **Script tags:** every checklist step says what the hardening script does for it (✅ done, 🔎 checks but you decide, ✋ by hand). Each checklist has a "Fast path: run the hardening script" step right after forensics. After an Apply run, **Tick the script's ✅ steps** ticks them all, so "Hide finished steps" and "Go to next step" skip straight to what's left.
 - **Learning path:** 7 lessons in order, with "Mark as read" and "Next lesson".
 - **Home page:**
   - "continue where you left off"
@@ -272,7 +273,7 @@ So the checklists still read well on GitHub, and editing `docs/` updates the web
 ## 6. Order of work
 
 1. ✅ Close the superseded PRs (#1 and #3).
-2. ✅ Linux script. It passes 54/54 checks in Debian 12, Ubuntu 22.04 and Mint 21.3 containers.
+2. ✅ Linux script. It passes 55/55 checks in Debian 12, Ubuntu 22.04 and Mint 21.3 containers.
 3. ✅ Windows script. It passes 38/38 logic tests, parses cleanly, and is PS 5.1-compatible. **Still needs a real run in Audit mode on a Windows practice image.**
 4. ✅ Checklists and guides for all six OSes, plus beginner guides.
 5. ✅ FreeBSD script (shellcheck clean). **Still needs a real run on FreeBSD.**

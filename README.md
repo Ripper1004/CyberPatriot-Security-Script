@@ -73,7 +73,7 @@ The pages are generated from `docs/` at build time, so **edit `docs/` and the we
 
 | Script | Tests |
 |---|---|
-| Linux | [`tests/linux/run-tests.sh`](tests/linux/run-tests.sh) builds a practice "image" in a **Debian 12, Ubuntu 22.04 and Linux Mint 21.3** container, plants ~30 vulnerabilities (hidden root account, PAM backdoor, cron reverse shell, SUID `find`, fake sudo alias…), runs the script, and checks **54 results**, including real logins with `pamtester`. All pass. |
+| Linux | [`tests/linux/run-tests.sh`](tests/linux/run-tests.sh) builds a practice "image" in a **Debian 12, Ubuntu 22.04 and Linux Mint 21.3** container, plants ~30 vulnerabilities (hidden root account, PAM backdoor, cron reverse shell, SUID `find`, fake sudo alias…), runs the script, and checks **55 results**, including real logins with `pamtester`. All pass. |
 | Windows | [`tests/windows/Test-HardenLogic.ps1`](tests/windows/Test-HardenLogic.ps1) loads the script's functions with fake `secedit.exe` and checks 38 behaviours. The script also parses cleanly and has no PSScriptAnalyzer findings or PowerShell 5.1 syntax problems. **It has not been run on a real Windows image yet.** Try **Audit** mode on a practice image first. |
 | FreeBSD | `shellcheck -s sh` clean. **Not yet run on a real FreeBSD system.** |
 
@@ -89,6 +89,7 @@ See [ROADMAP.md](ROADMAP.md): what was wrong with the old scripts, the design of
 
 ## Contributing
 - Keep the checklist item format: **What · Why it matters · Clicking · Typing · Check it worked · Warning**.
+- Under each step's `- [ ] Done`, keep one `**Script:**` line saying what the hardening script does for it: `✅` it does it fully, `🔎` it checks but a person decides, `✋` by hand. The website build stops if a checklist step has none. Only use ✅ if Apply mode really finishes the step.
 - Write for someone who has never done this before. Short sentences, explain every acronym.
 - Website changes: `cd site && npm install && npm test` (builds the site and checks every link). See [site/README.md](site/README.md).
 - Script changes: add a planted problem to `tests/linux/plant-vulns.sh` and a check to `tests/linux/verify.sh`, then run the tests.

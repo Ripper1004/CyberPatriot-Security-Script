@@ -8,6 +8,7 @@ import {
   resetSteps,
   setLessonRead,
   setStepDone,
+  setStepsDone,
   setValue,
   storageAvailable,
 } from './store';
@@ -18,6 +19,8 @@ interface StepRef {
   /** The element that gets the done styling (a step block or a list item). */
   el: HTMLElement;
   section: string;
+  /** auto = done by the hardening script, review = script checks, manual = by hand */
+  script?: string;
 }
 
 function initSteps(content: HTMLElement) {
@@ -46,7 +49,8 @@ function initSteps(content: HTMLElement) {
       if (!box) continue;
       box.id = `cp-step-${id}`;
       box.setAttribute('aria-describedby', block.querySelector('h3,h4')?.id ?? '');
-      steps.push({ id, box, el: block, section });
+      block.dataset.cpScript = marker.dataset.cpScript ?? '';
+      steps.push({ id, box, el: block, section, script: marker.dataset.cpScript });
     } else {
       // Inline step inside a task list item.
       const li = marker.closest('li');
@@ -128,6 +132,13 @@ function initSteps(content: HTMLElement) {
       setValue(hideKey, !getValue<boolean>(hideKey, false));
     } else if (action === 'print') {
       window.print();
+    } else if (action === 'script') {
+      const auto = steps.filter((s) => s.script === 'auto');
+      const ok = confirm(
+        `Tick the ${auto.length} steps marked ✅ (done by the script)?\n\n` +
+          'Only do this after running the script in APPLY mode. If the script printed FAILED for any of them, untick that step and do it by hand.',
+      );
+      if (ok) setStepsDone(page, auto.map((s) => s.id), true);
     } else if (action === 'reset') {
       if (confirm('Clear every tick on this checklist? Do this when you start a fresh practice image.')) resetSteps(page);
     }
@@ -179,7 +190,7 @@ function renderTocCounts(steps: StepRef[], done: Set<string>) {
       badge.className = 'cp-toc-count';
       a.append(badge);
     }
-    badge.textContent = `${counts.done}/${counts.total}`;
+    badge.textContent = ` ${counts.done}/${counts.total}`; // leading space reads well where Starlight copies the link text
     badge.classList.toggle('is-complete', counts.done === counts.total);
     badge.setAttribute('aria-label', `${counts.done} of ${counts.total} steps done`);
   });
