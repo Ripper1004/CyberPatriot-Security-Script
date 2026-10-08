@@ -82,20 +82,20 @@ last -a | head -20                            # recent logins
 **Why it matters:** The script does in a few minutes what takes an hour by hand, and it backs up every file before changing it. That leaves you more time for the steps that need a human.
 
 **Typing:**
-1. Get the toolkit onto the image (git or ZIP download): see [Using the scripts](../start-here/using-the-scripts.md).
-2. Optional: make a config file with the README config builder on the website and save it as `my.conf` in the `scripts/linux` folder. No config? Leave out `--config my.conf` and the script asks you for the README names instead.
+1. Get the script onto the image: open [Download the scripts](/downloads/) on this website and run the **Linux** download commands there. They save `harden.sh` and an example config in the `cp` folder inside your home folder (`~/cp`). No internet on the image? See [Using the scripts](../start-here/using-the-scripts.md).
+2. Optional: make a config file with the [README config builder](/tools/config-builder/) and save it as `my.conf` in `~/cp`, next to `harden.sh`. No config? Leave out `--config my.conf` and the script asks you for the README names instead.
 3. Run it in **audit** mode first (it changes nothing) and read every `REVIEW` line. Then run it in **apply** mode:
 ```bash
-cd CyberPatriot-Security-Script/scripts/linux       # or wherever you unzipped it
+cd ~/cp
 sudo bash harden.sh --audit --config my.conf        # report only: read the REVIEW lines
 sudo bash harden.sh --apply --config my.conf        # make the changes (it asks before risky ones)
 sudo cat /root/cyberpatriot/findings-*.txt          # your to-do list: every REVIEW item
 ```
 
-**`sudo` doesn't work yet (step 0.3)?** Use `su -` and leave out `sudo`. `su -` takes you to root's home folder, so `cd` back to the script first:
+**`sudo` doesn't work yet (step 0.3)?** Use `su -` and leave out `sudo`. `su -` takes you to root's home folder, so `cd` back to the folder with the script first:
 ```bash
 su -                                                # asks for ROOT's password
-cd /home/alice/Downloads/CyberPatriot-Security-Script-main/scripts/linux   # your user's folder
+cd /home/alice/cp                                  # your own user's home folder + /cp
 bash harden.sh --apply --config my.conf
 ```
 Run this way, the script can't tell who you are, so make sure **your own account** is in the README admin list you give it. It also won't lock root (see step 2.6).

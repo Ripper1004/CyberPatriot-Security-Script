@@ -6,7 +6,7 @@ How to run practice sessions with this toolkit in a class or club, even if your 
 
 - **Lessons** (the "Start here" pages): seven short reads, about an hour in total, that explain how an image, the README and scoring work.
 - **Checklists**, one per operating system. Every step says what to do, why it matters, how to do it by clicking and by typing, and how to check it worked. On the website, students tick steps off and see their progress.
-- **Tools** on the website: a README config builder, a round timer, a command finder, a glossary quiz and a progress page.
+- **Tools** on the website: a README config builder, a round timer, a round log, a findings to-do list for the script's report, a command finder, a forensics helper (file hashes and decoding), a glossary quiz, a networking quiz and a progress page.
 - **Hardening scripts** that show what can be automated. Students should learn the checklist first, so they understand what a script is doing.
 
 ## Before the first session
@@ -30,7 +30,7 @@ How to run practice sessions with this toolkit in a class or club, even if your 
 | 5 | Windows | Lesson 6 ([PowerShell basics](../start-here/powershell-basics.md)), [Windows 10 / 11 checklist](../checklists/windows-10-11.md) |
 | 6 | A full practice round | [Round game plan](../start-here/round-game-plan.md), the round timer in full-screen mode, the scripts in **Audit** mode |
 
-After that, rotate students through Windows Server and Debian, using their checklists.
+After that, rotate students through Windows Server and Debian, using their checklists. For the Cisco part of a round, use the [Cisco & Packet Tracer guide](cisco-networking.md) and the [Networking quiz](/tools/networking-quiz/) (it also has endless subnetting practice).
 
 ## Running a session
 

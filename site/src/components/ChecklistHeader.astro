@@ -2,6 +2,7 @@
 // Shown under the title of every checklist: which rounds use this OS, the
 // matching script, and the progress card with its controls.
 import { checklistById, checklistSteps, roundsFor, SCRIPTS } from '../data/site';
+import { checklistTools } from '../data/related';
 
 interface Props {
   id: string;
@@ -16,6 +17,7 @@ const fastPath = steps.find((s) => /fast path/i.test(s.title));
 const checklist = checklistById(id);
 const rounds = checklist ? roundsFor(checklist.image) : [];
 const script = SCRIPTS.find((s) => s.id === checklist?.script);
+const tools = checklistTools(checklist?.family ?? 'linux');
 ---
 
 <div class="cp-cl-meta not-content" data-pagefind-ignore>
@@ -43,6 +45,14 @@ const script = SCRIPTS.find((s) => s.id === checklist?.script);
       </a>
     )
   }
+  <span class="cp-cl-meta__item">
+    <span class="cp-cl-meta__label">Tools</span>
+    <span class="cp-cl-meta__tools">
+      {tools.map((t) => (
+        <a href={t.href}>{t.label}</a>
+      ))}
+    </span>
+  </span>
 </div>
 
 <section class="cp-progress not-content" data-cp-progress data-page={page} data-total={total} aria-label="Checklist progress" data-pagefind-ignore>

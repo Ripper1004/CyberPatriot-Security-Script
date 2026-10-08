@@ -1,4 +1,4 @@
-# What is CyberPatriot? (Start here if you're new)
+# What is CyberPatriot?
 
 CyberPatriot is a cyber **defense** competition for middle and high school students. You are not hacking anything. You are the IT person who has been handed a computer that was set up badly and maybe broken into, and your job is to **find and fix the security problems**.
 
@@ -47,20 +47,10 @@ Older practice images may also be Windows 10, Windows Server 2019, or Ubuntu. Th
 
 - Each team gets **one 4-hour block**. The clock starts when the first image is powered on.
 - Up to 5 people work at once. Usually each person takes one image or one task.
-- There is also a **Cisco networking** part (a quiz and a Packet Tracer activity). This toolkit doesn't cover it.
+- There is also a **Cisco networking** part (a quiz and a Packet Tracer activity). Study it with the [Cisco & Packet Tracer guide](../guides/cisco-networking.md) and the [Networking quiz](/tools/networking-quiz/).
 
 ## Where to go next
 
-1. [Reading the README](reading-the-readme.md). Always do this first.
-2. [Round game plan](round-game-plan.md): what to do in your 4 hours, minute by minute.
-3. If you've never used a terminal: [Linux terminal basics](linux-terminal-basics.md) or [PowerShell basics](powershell-basics.md).
-4. Pick your OS checklist:
-   - [Windows 10 / 11](../checklists/windows-10-11.md)
-   - [Windows Server](../checklists/windows-server.md)
-   - [Linux Mint](../checklists/linux-mint.md)
-   - [Debian](../checklists/debian.md)
-   - [Ubuntu](../checklists/ubuntu.md)
-   - [FreeBSD](../checklists/freebsd.md)
-5. [Things that lose points](../guides/things-that-lose-points.md). Read this before you touch anything.
-6. [Forensics questions](../guides/forensics-questions.md)
-7. [Glossary](../guides/glossary.md), if a word confuses you.
+Press **Next** below for lesson 2, [Things that lose points](../guides/things-that-lose-points.md), then keep going through the lessons in order.
+
+Already know the basics and want to start on an image? Open your checklist: [Windows 10 / 11](../checklists/windows-10-11.md) · [Windows Server](../checklists/windows-server.md) · [Linux Mint](../checklists/linux-mint.md) · [Debian](../checklists/debian.md) · [FreeBSD](../checklists/freebsd.md) · [Ubuntu](../checklists/ubuntu.md). If a word confuses you, look it up in the [Glossary](../guides/glossary.md).

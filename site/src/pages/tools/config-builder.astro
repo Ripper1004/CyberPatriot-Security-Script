@@ -462,7 +462,7 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
   function runSteps(): { text: string; cmd?: string }[] {
     if (os === 'windows') {
       return [
-        { text: 'Save the file next to Harden.ps1. Open PowerShell as Administrator in that folder.' },
+        { text: 'Save the file as my-readme.psd1 in C:\\cp (next to Harden.ps1). Open PowerShell as Administrator and go there:', cmd: 'cd C:\\cp' },
         {
           text: 'Audit first (changes nothing, shows what it would do):',
           cmd: 'powershell -ExecutionPolicy Bypass -File .\\Harden.ps1 -Mode Audit -Config .\\my-readme.psd1',
@@ -473,13 +473,14 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
     }
     if (os === 'freebsd') {
       return [
-        { text: 'Save the file next to harden.sh, then become root:', cmd: 'su -' },
+        { text: 'Save the file as my.conf in ~/cp (next to harden.sh). Then become root:', cmd: 'su -' },
+        { text: 'Go to the folder:', cmd: 'cd ~/cp' },
         { text: 'Audit first (changes nothing):', cmd: 'sh harden.sh --audit --config my.conf' },
         { text: 'Read the REVIEW lines. Then apply the fixes:', cmd: 'sh harden.sh --apply --config my.conf' },
       ];
     }
     return [
-      { text: 'Save the file next to harden.sh (usually in Downloads), then open a terminal there.' },
+      { text: 'Save the file as my.conf in ~/cp (next to harden.sh), then open a terminal and go there:', cmd: 'cd ~/cp' },
       { text: 'Audit first (changes nothing, shows what it would do):', cmd: 'sudo bash harden.sh --audit --config my.conf' },
       { text: 'Read the REVIEW lines. Then apply the fixes:', cmd: 'sudo bash harden.sh --apply --config my.conf' },
       { text: 'Your to-do list:', cmd: 'sudo cat /root/cyberpatriot/findings-*.txt' },
@@ -514,7 +515,10 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
 
     // Checks
     const checks: [string, string][] = [];
-    if (!admins.length) checks.push(['warn', 'No administrators yet. Every README lists at least one.']);
+    // Nothing typed yet: don't greet people with warnings about an empty form
+    const fresh = !admins.length && !users.length && !el.pass.value && !me;
+    if (fresh) checks.push(['info', 'Fill in the steps on the left. Your config file and the commands to run it appear here as you type.']);
+    else if (!admins.length) checks.push(['warn', 'No administrators yet. Every README lists at least one.']);
     const both = admins.filter((a) => users.includes(a));
     if (both.length) checks.push(['danger', `Listed as both admin and user: ${both.join(', ')}. Put each name in one list only.`]);
     const bad = [...admins, ...users].filter((n) => !/^[a-z_][a-z0-9._-]*\$?$/i.test(n));
@@ -530,12 +534,14 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
           : 'Strong password ✓'
         : 'Type a password or press Generate.';
       el.strength.className = `cb__strength ${el.pass.value && !issues.length ? 'is-ok' : 'is-bad'}`;
-      if (!el.pass.value) checks.push(['warn', 'No password set: the script will ask for one.']);
+      if (!el.pass.value) {
+        if (!fresh) checks.push(['warn', 'No password set: the script will ask for one.']);
+      }
       else if (issues.length) checks.push(['warn', `Weak password: needs ${issues.join(', ')}.`]);
       if (os !== 'windows' && el.pass.value.includes('"') && el.pass.value.includes("'"))
         checks.push(['danger', 'The password can’t contain both " and \' for this script. Remove one of them.']);
     }
-    if (!services.length) checks.push(['info', 'No critical services ticked. That’s fine if the README lists none.']);
+    if (!services.length && !fresh) checks.push(['info', 'No critical services ticked. That’s fine if the README lists none.']);
     if (!checks.length) checks.push(['success', 'Looks good. Double-check every name against the README once more.']);
     el.checks.innerHTML = checks.map(([k, t]) => `<p class="cp-callout cp-callout--${k}">${esc(t)}</p>`).join('');
 
@@ -743,7 +749,7 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
   .cb__services {
     display: grid;
     gap: 0.4rem;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 13.5rem), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 11.5rem), 1fr));
   }
   .cb__services :global(.cb__svc) {
     display: flex;

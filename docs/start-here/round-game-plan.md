@@ -1,4 +1,4 @@
-# Round game plan (your 4 hours)
+# Round game plan
 
 A good plan matters more than speed. Teams lose the most points by rushing and breaking something the README needed.
 

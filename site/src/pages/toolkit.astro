@@ -67,6 +67,9 @@ const runCmds = [
 
     <section id="lists" aria-labelledby="tk-lists">
       <h2 id="tk-lists" class="tk__h">Checklists</h2>
+      <p class="cp-hint tk__legend">
+        <span aria-hidden="true">✅</span> number = steps the script does for you. Ticks are saved in this browser.
+      </p>
       <div class="tk__lists">
         {
           lists.map((c) => (
@@ -134,7 +137,8 @@ const runCmds = [
       </div>
       <p class="cp-hint">
         Swap <code>--audit</code> / <code>Audit</code> for <code>--apply</code> / <code>Apply</code> after reading the REVIEW
-        lines. Works on: {SCRIPTS.map((s) => s.worksOn).join(' · ')}.
+        lines. Works on: {SCRIPTS.map((s) => s.worksOn).join(' · ')}. Files and checksums:{' '}
+        <a href="/downloads/">Download the scripts</a>.
       </p>
     </section>
   </div>
@@ -196,6 +200,9 @@ const runCmds = [
     background: var(--sl-color-accent-low);
     color: var(--sl-color-white);
     text-decoration: none;
+  }
+  .tk__legend {
+    margin: -0.35rem 0 0.7rem;
   }
   .tk__h {
     margin: 0 0 0.6rem;

@@ -23,4 +23,4 @@ The **CyberPatriot Toolkit** gathers step-by-step checklists, beginner lessons, 
 
 ## Changing something
 
-Found a mistake, or want to add a step? Use the **Edit page** link at the bottom of any checklist or lesson. It opens the page's Markdown file on GitHub. Keep the checklist format: **What · Why it matters · Clicking · Typing · Check it worked**, written for someone who has never done this before. The repository's [README](https://github.com/Ripper1004/CyberPatriot-Security-Script#readme) has the details.
+Mentors: see [Keeping the material up to date](/guides/for-mentors-and-teachers/#keeping-the-material-up-to-date).

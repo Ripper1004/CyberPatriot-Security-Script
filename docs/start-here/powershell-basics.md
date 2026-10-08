@@ -1,4 +1,4 @@
-# PowerShell basics (for people who have never typed a command)
+# PowerShell basics
 
 **PowerShell** is Windows' command window. You can do most CyberPatriot fixes by clicking, but PowerShell is much faster for checking things, like listing every user or every service at once.
 
