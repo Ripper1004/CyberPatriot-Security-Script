@@ -69,7 +69,7 @@ sudo find / -iname "*secret*" 2>/dev/null          # find a file by name
 sudo grep -rIl "password" /home 2>/dev/null        # find files that contain a word
 sha256sum /path/to/file                            # hash of a file
 echo 'aGVsbG8=' | base64 -d                        # decode base64
-grep -E 'Accepted|Failed' /var/log/auth.log        # who logged in / failed to
+sudo grep -E 'Accepted|Failed' /var/log/auth.log   # who logged in / failed to
 ```
 More techniques: [Forensics questions guide](../guides/forensics-questions.md).
 
@@ -196,7 +196,7 @@ The second command lists low-UID accounts that have a real shell. Normally that'
 **Fix:**
 ```bash
 sudo userdel -f toor                            # delete a fake root
-sudo usermod -s /usr/sbin/nologin sysbackup     # stop a hidden user from logging in
+sudo usermod -s /usr/sbin/nologin mallory       # stop a hidden user from logging in
 ```
 
 ### 2.6 Check other powerful groups
@@ -246,8 +246,28 @@ sudo passwd -S root      # "root L ..." = locked (good). "root P ..." = has a pa
 sudo passwd -l root      # lock it
 ```
 
+**Check it worked:** `sudo passwd -S root` shows `L` after the name.
+
 > [!CAUTION]
 > Only do this if **you** can use `sudo` (step 0.3 worked). Otherwise you lock yourself out of admin.
+
+### 2.9 Accounts with no password
+- [ ] Done
+
+**Script:** 🔎 The script lists every account with an empty password and locks the ones that aren't in the README (it asks first); README users with no password get one from you.
+
+**What:** Find accounts that have **no password at all**, so anyone can log in as them by just pressing Enter.
+
+**Why it matters:** An empty password is a common planted problem. Removing `nullok` (step 3.5) blocks these logins, but the account should still get a real password or be locked.
+
+**Typing:**
+```bash
+sudo passwd -S -a | awk '$2 == "NP" {print $1}'   # NP = no password; should print nothing
+sudo passwd bob                                    # README user: give them a strong password
+sudo passwd -l mallory                             # account that shouldn't log in: lock it
+```
+
+**Check it worked:** the first command prints nothing.
 
 ---
 
@@ -334,6 +354,8 @@ Find the line containing `pam_unix.so` and add ` remember=5` to the end, e.g.:
 password  [success=1 default=ignore]  pam_unix.so obscure use_authtok try_first_pass yescrypt remember=5
 ```
 
+**Check it worked:** `grep remember /etc/pam.d/common-password` shows `remember=5`.
+
 ### 3.5 No logins with an empty password
 - [ ] Done
 
@@ -348,6 +370,8 @@ password  [success=1 default=ignore]  pam_unix.so obscure use_authtok try_first_
 grep nullok /etc/pam.d/common-auth
 sudo sed -i 's/ nullok//' /etc/pam.d/common-auth
 ```
+
+**Check it worked:** `grep -c nullok /etc/pam.d/common-auth` prints `0`.
 
 ### 3.6 Account lockout after failed logins (careful!)
 - [ ] Done
@@ -384,10 +408,10 @@ sudo sed -i 's/ nullok//' /etc/pam.d/common-auth
    account required                        pam_faillock.so
    ```
 
-**Check it worked:** `su - bob` with the right password works. `sudo faillock --user bob` shows failures.
+**Check it worked:** `su - bob` with the right password works. `sudo faillock --user bob` shows failures. Locked out a user by testing? `sudo faillock --user bob --reset` unlocks them.
 
 > [!NOTE]
-> Mint 20 and Ubuntu 20.04 are too old for `pam_faillock`. They use `pam_tally2` instead: add `auth required pam_tally2.so onerr=fail deny=5 unlock_time=900` as the **first** `auth` line in `common-auth`.
+> Mint 20 and Ubuntu 20.04 are too old for `pam_faillock`. They use `pam_tally2` instead: add `auth required pam_tally2.so onerr=fail deny=5 unlock_time=900` as the **first** `auth` line in `common-auth`, and `account required pam_tally2.so` to the end of `common-account`.
 
 ---
 
@@ -400,7 +424,7 @@ sudo sed -i 's/ nullok//' /etc/pam.d/common-auth
 
 **What:** Block every incoming connection except the ones the README needs.
 
-**Clicking:** **Menu → Administration → Firewall Configuration**. Switch **Status** on, set **Incoming: Deny** and **Outgoing: Allow**.
+**Clicking:** **Menu → Preferences → Firewall Configuration** (or type `firewall` in the menu's search box). Switch **Status** on, set **Incoming: Deny** and **Outgoing: Allow**.
 
 **Typing:**
 ```bash
@@ -464,7 +488,13 @@ sudo apt full-upgrade -y
 
 **Script:** 🔎 The script sets up `20auto-upgrades` and turns on Mint's automatic updates; just check the Update Manager Options tab refreshes automatically.
 
-**Clicking:** **Update Manager → Edit → Preferences → Automation** → turn on **Apply updates automatically**. On the **Options** tab, make sure it refreshes the list of updates automatically.
+**Clicking:** **Update Manager → Edit → Preferences → Automation** → turn on **Apply updates automatically**. On the **Options** tab, make sure **Refresh the list of updates automatically** is on.
+
+The same switch from the terminal:
+```bash
+sudo mintupdate-automation upgrade enable                  # "Apply updates automatically"
+systemctl is-enabled mintupdate-automation-upgrade.timer   # prints "enabled" when it's on
+```
 
 **Typing (the setting many scoring engines check):**
 ```bash
@@ -501,8 +531,10 @@ Official addresses: `packages.linuxmint.com`, `archive.ubuntu.com`, `security.ub
 
 ```bash
 apt-mark showhold              # anything listed will never update
-sudo apt-mark unhold <name>
+sudo apt-mark unhold firefox   # change firefox to each name the line above printed
 ```
+
+**Check it worked:** `apt-mark showhold` prints nothing.
 
 ### 5.5 Update the apps the README mentions
 - [ ] Done
@@ -510,6 +542,12 @@ sudo apt-mark unhold <name>
 **Script:** 🔎 Done only if the script installed all updates (FULL_UPGRADE=yes or you said yes); still check Firefox's version.
 
 Firefox, Thunderbird, LibreOffice and any critical service are updated by 5.1. Check Firefox with **Menu (≡) → Help → About Firefox**.
+
+On Mint, Firefox is a normal `apt` package from the Mint servers (not a snap), so this shows anything still out of date:
+```bash
+apt list --upgradable 2>/dev/null | grep -Ei 'firefox|thunderbird|libreoffice'   # anything listed is out of date
+```
+If Update Manager never offers an update for a program, open **Update Manager → Edit → Preferences → Packages**. A package listed there is blocked from updating: select it and remove it from the list.
 
 ---
 
@@ -540,7 +578,7 @@ sudo apt purge vsftpd                      # remove it completely (if the README
 | Service | Package | Usually… |
 |---|---|---|
 | Telnet server | `telnetd`, `inetutils-telnetd` | **Remove** (sends passwords in plain text) |
-| FTP server | `vsftpd`, `proftpd`, `pure-ftpd` | Remove unless the README needs FTP |
+| FTP server | `vsftpd`, `proftpd-core`, `pure-ftpd` | Remove unless the README needs FTP |
 | Web server | `apache2`, `nginx` | Remove unless the README needs it |
 | Database | `mysql-server`, `mariadb-server`, `postgresql` | Remove unless needed |
 | Samba | `samba` | Remove unless file sharing is needed |
@@ -549,6 +587,10 @@ sudo apt purge vsftpd                      # remove it completely (if the README
 | Printing | `cups` | Disable unless printing is needed |
 | Avahi (network discovery) | `avahi-daemon` | Disable |
 | VNC / remote desktop | `x11vnc`, `vino`, `xrdp` | Remove unless needed |
+| DNS server | `bind9` | Remove unless the README needs DNS |
+| Mail server | `postfix`, `dovecot-core` | Remove unless the README needs mail |
+| Web proxy | `squid` | Remove unless needed |
+| Old insecure servers | `tftpd-hpa`, `xinetd`, `openbsd-inetd`, `rsh-server`, `nis` | **Remove** |
 | SSH server | `openssh-server` | Keep **only** if the README mentions SSH |
 
 > [!CAUTION]
@@ -599,7 +641,8 @@ sudo apt purge aisleriot gnome-mines
 
 ```bash
 dpkg -l | grep -Ei 'transmission|qbittorrent|deluge|frostwire|teamviewer|anydesk|x11vnc|tightvnc|vino'
-snap list 2>/dev/null; flatpak list 2>/dev/null
+flatpak list 2>/dev/null       # Mint's own app store installs flatpaks
+snap list 2>/dev/null          # Mint has no snap unless someone added it
 ```
 > [!NOTE]
 > Mint installs **Transmission** (a torrent program) by default. Remove it unless the README needs it: `sudo apt purge transmission-gtk transmission-common`
@@ -636,21 +679,28 @@ sudo ls -la /home/*/ /tmp /var/tmp /opt     # look for anything odd, including h
 ### 8.1 No guest sessions and no automatic login
 - [ ] Done
 
-**Script:** 🔎 The script turns off guest sessions and auto-login in the LightDM files; run the `grep -r autologin /etc/lightdm/` check to be sure no user name is left.
+**Script:** 🔎 The script turns off guest sessions and auto-login and hides the user list in the LightDM files; run the `grep` check below to be sure no user name is left.
 
-**Clicking:** **Menu → Administration → Login Window → Users** tab. Turn **Allow guest sessions** off. Clear the **Automatic login** username.
+**Clicking:** **Menu → Administration → Login Window → Users** tab. Turn **Allow guest sessions** off (this switch only appears if guest sessions are installed). Clear the **Automatic login** username. Turn **Hide the user list** and **Allow manual login** on, so the login screen doesn't show everyone's name.
 
 **Typing:**
 ```bash
 sudo nano /etc/lightdm/lightdm.conf
 ```
-Under `[Seat:*]`:
+Under `[Seat:*]` (if the file is new or empty, type the `[Seat:*]` line too):
 ```
+[Seat:*]
 allow-guest=false
 autologin-user=
+greeter-hide-users=true
 greeter-show-manual-login=true
 ```
-Also check: `grep -r autologin /etc/lightdm/`
+Also check the other LightDM files, because they can turn these back on:
+```bash
+grep -rE 'autologin|allow-guest|hide-users' /etc/lightdm/ /usr/share/lightdm/lightdm.conf.d/
+```
+
+**Check it worked:** the `grep` shows no user name after `autologin-user=` and no `allow-guest=true`. The changes show on the login screen after the next restart.
 
 ### 8.2 Lock the screen when idle
 - [ ] Done
@@ -660,9 +710,56 @@ Also check: `grep -r autologin /etc/lightdm/`
 **Clicking:** **Menu → System Settings → Screensaver**:
 - **Delay before starting the screensaver:** 5 minutes
 - **Lock the computer after the screensaver starts:** on
-- **Delay before locking:** immediately
+- **Delay before locking:** Lock immediately
 
-**Check it worked:** `gsettings get org.cinnamon.desktop.screensaver lock-enabled` prints `true`.
+**Typing:** run these in **your own** terminal, **without** `sudo` (`sudo gsettings` changes root's settings, not yours):
+```bash
+gsettings set org.cinnamon.desktop.session idle-delay 300           # 300 seconds = 5 minutes
+gsettings set org.cinnamon.desktop.screensaver lock-enabled true
+gsettings set org.cinnamon.desktop.screensaver lock-delay 0         # lock as soon as it starts
+```
+If it says **The key is not writable**, the script has already set and locked this for every user. That's fine.
+
+**Check it worked:** `gsettings get org.cinnamon.desktop.session idle-delay` prints `uint32 300` and `gsettings get org.cinnamon.desktop.screensaver lock-enabled` prints `true`. (The lock is on by default; the 15-minute delay is what usually needs fixing.)
+
+### 8.3 Don't open USB drives and CDs automatically
+- [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
+
+**What:** Stop Mint from mounting, opening and running programs from a USB stick or CD the moment it is plugged in.
+
+**Why it matters:** A planted USB stick can start malware on its own if autorun is on.
+
+**Clicking:** **Menu → Preferences → Preferred Applications → Removable media** tab → turn **Prompt or start programs on media insertion** off.
+
+**Typing:** in **your own** terminal, **without** `sudo`:
+```bash
+gsettings set org.cinnamon.desktop.media-handling autorun-never true     # never run programs from media
+gsettings set org.cinnamon.desktop.media-handling automount false        # don't mount drives by themselves
+gsettings set org.cinnamon.desktop.media-handling automount-open false   # don't open a window for them
+```
+
+**Check it worked:** `gsettings get org.cinnamon.desktop.media-handling autorun-never` prints `true`.
+
+> [!NOTE]
+> With automount off, a USB stick still works: click it in the file manager's side bar to open it.
+
+### 8.4 Ctrl + Alt + Delete doesn't restart the computer
+- [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
+
+**What:** Stop **Ctrl + Alt + Delete** on a text console (Ctrl + Alt + F3 and similar) from rebooting the machine straight away.
+
+**Why it matters:** Anyone at the keyboard could restart the computer without logging in.
+
+**Typing:**
+```bash
+sudo systemctl mask ctrl-alt-del.target
+```
+
+**Check it worked:** `systemctl is-enabled ctrl-alt-del.target` prints `masked`. (Inside your desktop, Ctrl + Alt + Delete still opens Cinnamon's log-out window; that's normal.)
 
 ---
 
@@ -682,6 +779,7 @@ If the README doesn't mention SSH or remote logins:
 sudo systemctl disable --now ssh
 sudo apt purge openssh-server
 ```
+On **Mint 22**, SSH can also be started on demand by `ssh.socket`; if you keep the package, turn that off too (see [SSH on Ubuntu 22.10 and newer](ubuntu.md#ssh-on-ubuntu-2210-and-newer)).
 
 ### 9.2 Needed? Make it safe.
 - [ ] Done
@@ -713,6 +811,9 @@ Then test and reload:
 ```bash
 sudo sshd -t && sudo systemctl reload ssh       # sshd -t prints nothing if the file is OK
 ```
+If `sshd -t` says **Missing privilege separation directory: /run/sshd**, SSH is stopped right now: run `sudo mkdir -p /run/sshd` and test again.
+
+**Check it worked:** `sudo sshd -T | grep -Ei 'permitrootlogin|permitemptypasswords|maxauthtries'` shows `permitrootlogin no`, `permitemptypasswords no` and `maxauthtries 4`.
 
 > [!WARNING]
 > Leave `PasswordAuthentication yes` unless the README says otherwise. Nobody on a practice image has SSH keys set up, so turning passwords off locks everyone out.
@@ -778,6 +879,22 @@ sudo sysctl -p
 
 **Check:** `sysctl kernel.randomize_va_space` prints `= 2`. Also look for files in `/etc/sysctl.d/` that set the opposite (for example `ip_forward=1`): `grep -r . /etc/sysctl.d/`
 
+### 10.2 Turn off core dumps
+- [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
+
+**What:** Stop crashing programs from writing a "core dump" (a copy of everything in their memory) to disk.
+
+**Why it matters:** A core dump can contain passwords and keys that were in the program's memory. `fs.suid_dumpable = 0` in 10.1 covers programs that run as root; this line covers everyone else.
+
+**Typing:**
+```bash
+echo '* hard core 0' | sudo tee -a /etc/security/limits.conf
+```
+
+**Check it worked:** `sudo -u bob bash -c 'ulimit -Hc'` prints `0` (new logins pick it up; your open terminal keeps the old value).
+
 ---
 
 ## 11. File permissions
@@ -793,6 +910,8 @@ sudo chmod 644 /etc/passwd /etc/group
 sudo chmod 640 /etc/shadow /etc/gshadow
 sudo chown root:shadow /etc/shadow /etc/gshadow
 ```
+
+**Check it worked:** run the `ls -l` line again: `passwd` and `group` show `-rw-r--r-- root root`, `shadow` and `gshadow` show `-rw-r----- root shadow`.
 
 ### 11.2 SUID programs (run as root for anyone)
 - [ ] Done
@@ -817,6 +936,8 @@ sudo find / -xdev -type f -perm -0002 ! -path '/proc/*' ! -path '/sys/*' 2>/dev/
 sudo chmod o-w /path/to/file
 ```
 
+**Check it worked:** the `find` line prints nothing (files inside `/tmp` are OK).
+
 ### 11.4 Home folders
 - [ ] Done
 
@@ -826,6 +947,8 @@ sudo chmod o-w /path/to/file
 ls -ld /home/*
 sudo chmod 750 /home/bob        # other users can't look inside
 ```
+
+**Check it worked:** in `ls -ld /home/*` every folder ends in `---`, e.g. `drwxr-x--- bob bob`. Each folder should also belong to its own user (`sudo chown bob: /home/bob` fixes one that doesn't).
 
 ---
 
@@ -868,6 +991,8 @@ sudo visudo -f /etc/sudoers.d/90-bob # a file in sudoers.d
 sudo ls -la /var/spool/cron/crontabs/                  # one file per user
 for u in $(cut -d: -f1 /etc/passwd); do sudo crontab -l -u $u 2>/dev/null | grep -v '^#' | sed "s/^/$u: /"; done
 cat /etc/crontab; ls -la /etc/cron.d /etc/cron.hourly /etc/cron.daily
+sudo atq 2>/dev/null                                   # one-off "at" jobs (remove one: sudo atrm 3)
+systemctl list-timers --all                            # systemd timers: another kind of scheduled job
 ```
 Red flags: `nc`, `ncat`, `bash -i`, `/dev/tcp/`, `curl ... | bash`, `wget`, `base64 -d`, `python -c`, files in `/tmp`.
 
@@ -917,7 +1042,9 @@ Watch for aliases that hijack commands, e.g. `alias sudo='...'` or `alias ls='..
 ```bash
 cat /etc/hosts
 ```
-Only `127.0.0.1 localhost`, `127.0.1.1 <this computer's name>` and the `ip6-` lines are normal. A line like `10.6.6.6 www.google.com` sends that website to an attacker. Put `#` in front of it.
+Only `127.0.0.1 localhost`, `127.0.1.1 <this computer's name>` and the `ip6-` lines are normal. A line like `10.6.6.6 www.google.com` sends that website to an attacker. Put `#` in front of it (`sudo nano /etc/hosts`).
+
+**Check it worked:** `grep -v '^#' /etc/hosts` shows only the normal lines.
 
 ### 13.6 Hidden root-kit tricks
 - [ ] Done
@@ -944,7 +1071,7 @@ grep -n 'pam_permit' /etc/pam.d/common-auth # "auth sufficient pam_permit.so" = 
 **Script:** 🔎 The script reinstalls packages whose programs were changed (it asks first); other changed files in the `dpkg --verify` output are up to you.
 
 ```bash
-sudo dpkg --verify | grep -v ' c '           # lines with a 5 = changed file
+sudo dpkg --verify | grep -v ' c '           # takes a minute or two; lines with a 5 = changed file
 ```
 Fix by reinstalling the package that owns it: `dpkg -S /usr/bin/ls`, then `sudo apt install --reinstall coreutils`.
 
@@ -954,10 +1081,15 @@ Fix by reinstalling the package that owns it: `dpkg -S /usr/bin/ls`, then `sudo 
 **Script:** ✋ Not done by the script. Do this by hand.
 
 ```bash
-sudo apt install clamav rkhunter
-sudo freshclam; sudo clamscan -ri /home
-sudo rkhunter --check --sk
+sudo apt install clamav rkhunter chkrootkit
+sudo systemctl stop clamav-freshclam      # the updater service blocks a manual update while it runs
+sudo freshclam                            # download the newest virus list
+sudo systemctl start clamav-freshclam
+sudo clamscan -ri /home                   # -r = every subfolder, -i = list only infected files
+sudo rkhunter --check --sk                # --sk = don't stop for Enter after each part
+sudo chkrootkit | grep INFECTED           # nothing printed = nothing found
 ```
+These tools only **report**. Look at each file they name (forensics first!) before you delete it. Warnings from `rkhunter` and `chkrootkit` are often false alarms (for example `Linux.Xor.DDoS` for a harmless script in `/tmp`); `sudo less /var/log/rkhunter.log` shows the details.
 
 ---
 
@@ -981,6 +1113,8 @@ echo '-w /etc/passwd -p wa -k identity
 sudo augenrules --load
 ```
 
+**Check it worked:** `systemctl is-active auditd rsyslog` prints `active` twice, and `sudo auditctl -l` lists the `-w /etc/passwd` rules.
+
 ---
 
 ## 15. AppArmor
@@ -994,7 +1128,12 @@ sudo augenrules --load
 sudo aa-status
 sudo systemctl enable --now apparmor
 ```
-If a profile is in **complain** mode for no reason, enforce it: `sudo aa-enforce /etc/apparmor.d/<profile>` (needs `apparmor-utils`).
+If a profile is in **complain** mode for no reason, enforce it (needs `sudo apt install apparmor-utils`):
+```bash
+sudo aa-enforce /usr/bin/man      # change /usr/bin/man to the name aa-status listed under "complain mode"
+```
+
+**Check it worked:** `sudo aa-status` starts with `apparmor module is loaded` and lists profiles `in enforce mode`; `systemctl is-enabled apparmor` prints `enabled`.
 
 ---
 
@@ -1004,9 +1143,36 @@ If the README needs a web server, database, FTP, Samba or similar, **harden it i
 
 ---
 
-## 17. Final checks
+## 17. Web browser (Firefox)
 
-- [ ] Every critical service is running: `systemctl status <service>`
+### 17.1 Firefox security settings
+- [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
+
+**What:** Turn on Firefox's built-in protections. Images often switch them off.
+
+**Why it matters:** Pop-ups, add-on installs and fake websites are how malware gets onto a desktop.
+
+**Clicking:** open Firefox → **≡ → Settings → Privacy & Security**. Labels move between Firefox versions, so if you can't find one, type a word from it (`pop-up`, `add-ons`, `deceptive`, `HTTPS`) into the **Find in Settings** box at the top.
+- **Block pop-up windows** ✔
+- **Warn you when websites try to install add-ons** ✔
+- **Block dangerous and deceptive content** ✔ (and the boxes under it)
+- **HTTPS-Only Mode** → on in all windows
+- **Passwords:** untick saving passwords unless the README needs it, and check **Saved passwords** for any that shouldn't be there
+
+Then open **≡ → Add-ons and themes → Extensions** and remove any you don't recognise.
+
+**Check it worked:** close and reopen Firefox, then look at the same page again: the boxes are still ticked. If a box is greyed out with "Your browser is being managed by your organization", look at `about:policies` to see which rule sets it.
+
+> [!NOTE]
+> Do this in the Firefox of the user you are logged in as. Each user has their own Firefox settings.
+
+---
+
+## 18. Final checks
+
+- [ ] Every critical service is running: `systemctl status ssh` (repeat with each service the README lists)
 - [ ] You can still use `sudo`
 - [ ] The Scoring Report shows **no penalties**
 - [ ] All forensics answers are saved
