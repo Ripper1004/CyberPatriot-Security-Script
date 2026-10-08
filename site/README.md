@@ -38,9 +38,11 @@ After you change something in `docs/`, stop `npm run dev` and start it again so 
    | Build command | `npm run build` |
    | Build output directory | `dist` |
    | Root directory (under *Advanced*) | `site` |
-   | Environment variable (optional) | `SITE_URL` = your site's address, e.g. `https://cp-toolkit.pages.dev` |
+   | Environment variable (optional) | `SITE_URL`, only if your address is not `https://cp-toolkit.pages.dev` (e.g. a custom domain) |
 
 5. Click **Save and Deploy**. The first build takes 1–2 minutes. Your site is then at `https://<project-name>.pages.dev`.
+
+The live site is **https://cp-toolkit.pages.dev/**.
 
 From then on, every merge into `main` updates the site automatically, and every pull request gets its own preview link.
 
@@ -58,7 +60,7 @@ Students then get a one-time code by email before the site opens.
 
 ### Optional: a nicer address
 
-In the Pages project, use **Custom domains** to add a domain you own, e.g. `cyber.yourschool.org`.
+In the Pages project, use **Custom domains** to add a domain you own, e.g. `cyber.yourschool.org`. Then set the `SITE_URL` environment variable to that address and redeploy.
 
 ## How the site is organised
 

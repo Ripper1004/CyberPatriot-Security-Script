@@ -2,7 +2,7 @@
 
 Beginner-friendly **checklists**, **guides** and **hardening scripts** for practicing CyberPatriot image challenges on Windows, Windows Server, Linux Mint, Debian, Ubuntu and FreeBSD.
 
-> **New to this?** Use the **website** (see [Website](#website) below), or start at **[docs/index.md](docs/index.md)** here on GitHub. Both walk you through everything in order.
+> **New to this?** Use the website: **https://cp-toolkit.pages.dev/**, or start at **[docs/index.md](docs/index.md)** here on GitHub. Both walk you through everything in order.
 
 ---
 
@@ -52,7 +52,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\Harden.ps1
 
 ## Website
 
-[`site/`](site/) turns everything above into a website for people who don't use GitHub. It's built with Astro + Starlight and hosted on Cloudflare Pages.
+**https://cp-toolkit.pages.dev/**: [`site/`](site/) turns everything above into a website for people who don't use GitHub. It's built with Astro + Starlight and hosted on Cloudflare Pages.
 
 - **Interactive checklists:** tick off steps, see your progress, jump to the next step, print, and reset for a new image.
 - **A 7-lesson learning path** for beginners.
