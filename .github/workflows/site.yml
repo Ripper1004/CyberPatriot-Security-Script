@@ -1,0 +1,30 @@
+name: Website
+
+on:
+  pull_request:
+    paths: ['docs/**', 'scripts/**', 'site/**', '.github/workflows/site.yml']
+  push:
+    branches: [main]
+    paths: ['docs/**', 'scripts/**', 'site/**', '.github/workflows/site.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: site/.node-version
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+      - name: Type check
+        run: npm run check
+      - name: Build and verify links, steps and downloads
+        run: npm test

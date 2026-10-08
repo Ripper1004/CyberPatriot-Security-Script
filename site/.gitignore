@@ -1,0 +1,11 @@
+# build output
+dist/
+.astro/
+node_modules/
+
+# generated from ../docs and ../scripts by scripts/sync-docs.mjs
+src/content/docs/start-here/
+src/content/docs/checklists/
+src/content/docs/guides/
+src/data/generated/
+public/files/

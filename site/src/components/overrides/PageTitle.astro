@@ -1,0 +1,25 @@
+---
+// Starlight's page title, plus a header for checklists (rounds, script,
+// progress) and lessons (lesson N of 7).
+import Default from '@astrojs/starlight/components/PageTitle.astro';
+import ChecklistHeader from '../ChecklistHeader.astro';
+import { lessons } from '../../data/site';
+
+const { entry } = Astro.locals.starlightRoute;
+const cp = (entry.data as { cp?: { kind: string; id: string; lesson?: number; steps?: number } }).cp;
+const lesson = cp?.lesson ? lessons[cp.lesson - 1] : undefined;
+---
+
+<Default />
+{cp?.kind === 'checklist' && <ChecklistHeader id={cp.id} page={entry.id} total={cp.steps ?? 0} />}
+{
+  lesson && (
+    <p class="cp-lesson-chip">
+      <span class="cp-lesson-chip__n">Lesson {lesson.n} of {lessons.length}</span>
+      <span>About {lesson.minutes} min</span>
+      <span class="cp-lesson-chip__state" data-cp-lesson-state={lesson.id} hidden>
+        ✓ Read
+      </span>
+    </p>
+  )
+}

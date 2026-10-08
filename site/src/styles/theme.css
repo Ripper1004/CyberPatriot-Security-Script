@@ -1,0 +1,71 @@
+/* Brand theme: navy + sky blue. Starlight reads these variables. */
+
+:root {
+  --sl-font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --sl-font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  /* Dark mode (default) */
+  --sl-color-accent-low: #0c2a45;
+  --sl-color-accent: #38bdf8;
+  --sl-color-accent-high: #c9ecff;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e6ecf5;
+  --sl-color-gray-2: #c3cddd;
+  --sl-color-gray-3: #8d9ab0;
+  --sl-color-gray-4: #56637b;
+  --sl-color-gray-5: #2b3549;
+  --sl-color-gray-6: #151d2c;
+  --sl-color-black: #0b1220;
+
+  /* Our own tokens */
+  --cp-radius: 0.85rem;
+  --cp-radius-sm: 0.55rem;
+  --cp-success: #34d399;
+  --cp-success-low: #0b3a2c;
+  --cp-warn: #fbbf24;
+  --cp-warn-low: #3d2c07;
+  --cp-danger: #f87171;
+  --cp-danger-low: #44161a;
+  --cp-card: #111a2a;
+  --cp-card-hover: #15213a;
+  --cp-border: #243149;
+  --cp-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.55);
+  --cp-glow: radial-gradient(60rem 30rem at 85% -10%, rgb(56 189 248 / 0.16), transparent 60%),
+    radial-gradient(40rem 26rem at -10% 10%, rgb(37 99 235 / 0.14), transparent 60%);
+  --cp-gradient: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+
+  --cp-os-windows: #3b82f6;
+  --cp-os-server: #6366f1;
+  --cp-os-mint: #22c55e;
+  --cp-os-debian: #e11d48;
+  --cp-os-freebsd: #ef4444;
+  --cp-os-ubuntu: #f97316;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d9eefd;
+  --sl-color-accent: #0a64c2;
+  --sl-color-accent-high: #0b3768;
+  --sl-color-white: #0b1220;
+  --sl-color-gray-1: #172033;
+  --sl-color-gray-2: #2f3b52;
+  --sl-color-gray-3: #55627c;
+  --sl-color-gray-4: #8a96ad;
+  --sl-color-gray-5: #cfd7e4;
+  --sl-color-gray-6: #edf1f7;
+  --sl-color-gray-7: #f6f8fb;
+  --sl-color-black: #ffffff;
+
+  --cp-success: #059669;
+  --cp-success-low: #d6f5e9;
+  --cp-warn: #b45309;
+  --cp-warn-low: #fdf0d5;
+  --cp-danger: #dc2626;
+  --cp-danger-low: #fde2e2;
+  --cp-card: #ffffff;
+  --cp-card-hover: #f5f9ff;
+  --cp-border: #dbe2ec;
+  --cp-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 10px 24px -14px rgb(15 23 42 / 0.25);
+  --cp-glow: radial-gradient(60rem 30rem at 85% -10%, rgb(56 189 248 / 0.18), transparent 60%),
+    radial-gradient(40rem 26rem at -10% 10%, rgb(37 99 235 / 0.1), transparent 60%);
+}

@@ -1,0 +1,60 @@
+/* Printing a checklist gives a clean paper copy with tick boxes. */
+@media print {
+  :root {
+    --sl-color-white: #000;
+    --sl-color-gray-1: #111;
+    --sl-color-gray-2: #222;
+    --sl-color-gray-3: #444;
+    --sl-color-black: #fff;
+    --cp-card: #fff;
+    --cp-border: #bbb;
+  }
+  header.header,
+  .sidebar-pane,
+  nav.sidebar,
+  .right-sidebar-container,
+  mobile-starlight-toc,
+  starlight-toc,
+  .pagination-links,
+  .meta,
+  footer,
+  .cp-progress__actions,
+  .cp-topbar,
+  .cp-lesson-done,
+  .sl-anchor-link,
+  .copy,
+  .skiplink {
+    display: none !important;
+  }
+  body,
+  .main-frame,
+  .main-pane {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+  }
+  .sl-markdown-content .cp-block {
+    break-inside: avoid-page;
+    opacity: 1 !important;
+  }
+  .sl-markdown-content .cp-block > * {
+    opacity: 1 !important;
+  }
+  .cp-hide-done .cp-block.is-done {
+    display: block !important;
+  }
+  .sl-markdown-content h2 {
+    break-after: avoid-page;
+  }
+  pre,
+  .expressive-code {
+    break-inside: avoid;
+  }
+  .cp-step__label {
+    border: 0;
+    padding: 0;
+  }
+  a {
+    color: #000 !important;
+  }
+}

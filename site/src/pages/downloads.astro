@@ -1,0 +1,320 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { SCRIPTS } from '../data/site';
+import { REPO_URL } from '../data/catalog.mjs';
+import downloads from '../data/generated/downloads.json';
+
+const kb = (b: number) => `${(b / 1024).toFixed(0)} KB`;
+const tested = {
+  tested: { cls: 'cp-pill--success', text: 'Tested' },
+  partial: { cls: 'cp-pill--warn', text: 'Partly tested' },
+  untested: { cls: 'cp-pill--warn', text: 'Not yet run on a real system' },
+} as const;
+
+// Commands to fetch the files on the VM. ORIGIN is replaced in the browser with this site's address.
+function getCommands(id: string) {
+  const files = downloads.filter((d) => d.script === id);
+  if (id === 'windows') {
+    return {
+      label: 'PowerShell (as Administrator)',
+      lines: [
+        'mkdir C:\\cp -Force; cd C:\\cp',
+        ...files.map((f) => `Invoke-WebRequest -Uri ORIGIN${f.url} -OutFile ${f.name} -UseBasicParsing`),
+      ],
+      verify: `Get-FileHash .\\${files[0].name} -Algorithm SHA256`,
+    };
+  }
+  if (id === 'freebsd') {
+    return {
+      label: 'Terminal (as root: su -)',
+      lines: files.map((f) => `fetch ORIGIN${f.url}`),
+      verify: `sha256 ${files[0].name}`,
+    };
+  }
+  return {
+    label: 'Terminal',
+    lines: ['mkdir -p ~/cp && cd ~/cp', ...files.map((f) => `wget ORIGIN${f.url}`)],
+    verify: `sha256sum ${files[0].name}`,
+  };
+}
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Download the scripts',
+    description: 'Get the hardening scripts onto your practice virtual machine, with one-line download commands and checksums.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="dl cp-wide not-content">
+    <div class="cp-callout cp-callout--warn dl__warn">
+      <p><strong>Read <a href="/start-here/using-the-scripts/">Using the scripts safely</a> before you run anything.</strong></p>
+      <p>
+        Always run <strong>Audit</strong> mode first: it changes nothing. Practice images only. Never run these on a computer
+        you don't own or aren't allowed to change.
+      </p>
+    </div>
+
+    <ol class="dl__how">
+      <li><span>1</span><p><strong>Download</strong> on the practice VM with the commands below (or the buttons).</p></li>
+      <li><span>2</span><p><strong>Make a config</strong> with the <a href="/tools/config-builder/">README config builder</a> (optional).</p></li>
+      <li><span>3</span><p><strong>Audit</strong>, read the REVIEW lines, then <strong>Apply</strong>.</p></li>
+    </ol>
+
+    {
+      SCRIPTS.map((s) => {
+        const files = downloads.filter((d) => d.script === s.id);
+        const main = files[0];
+        const cmds = getCommands(s.id);
+        const t = tested[s.testedLevel];
+        return (
+          <section class="dl__card" id={s.id} aria-labelledby={`${s.id}-title`}>
+            <div class="dl__head">
+              <div>
+                <h2 id={`${s.id}-title`} class="dl__title">
+                  {s.name}
+                </h2>
+                <p class="dl__works">{s.worksOn}</p>
+              </div>
+              <span class={`cp-pill ${t.cls}`}>{t.text}</span>
+            </div>
+            <p class="dl__tested">{s.tested}</p>
+
+            <div class="dl__files">
+              {files.map((f) => (
+                <div class="dl__file">
+                  <div class="dl__file-info">
+                    <code class="dl__file-name">{f.name}</code>
+                    <span class="dl__file-meta">
+                      {f === main ? s.language : 'Example config'} · {kb(f.bytes)} · {f.lines.toLocaleString('en-US')} lines
+                    </span>
+                    <span class="dl__hash" title="SHA-256 checksum">
+                      SHA-256 <code>{f.sha256}</code>
+                    </span>
+                  </div>
+                  <div class="dl__file-actions">
+                    <a class="cp-btn cp-btn--sm cp-btn--primary" href={f.url} download={f.name}>
+                      Download
+                    </a>
+                    <a class="cp-btn cp-btn--sm" href={`${REPO_URL}/blob/main/${f.file}`} rel="noopener">
+                      View code
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p class="dl__label">Download it on the VM · {cmds.label}</p>
+            <div class="dl__term">
+              <pre data-origin-template>{cmds.lines.join('\n')}</pre>
+              <button type="button" class="cp-btn cp-btn--sm" data-copy-pre>
+                Copy
+              </button>
+            </div>
+            <p class="dl__label">Run it</p>
+            <div class="dl__term">
+              <pre>{s.run}</pre>
+              <button type="button" class="cp-btn cp-btn--sm" data-copy-pre>
+                Copy
+              </button>
+            </div>
+            <details class="dl__more">
+              <summary>Check the download isn't damaged</summary>
+              <p>Run this and compare the result with the SHA-256 above. They must match exactly.</p>
+              <div class="dl__term">
+                <pre>{cmds.verify}</pre>
+                <button type="button" class="cp-btn cp-btn--sm" data-copy-pre>
+                  Copy
+                </button>
+              </div>
+            </details>
+          </section>
+        );
+      })
+    }
+
+    <p class="cp-hint dl__foot">
+      No internet on the VM? Download on another computer and copy the files over with a USB drive or a shared folder, or
+      download the whole repository as a ZIP from <a href={REPO_URL}>GitHub</a> (Code → Download ZIP).
+    </p>
+  </div>
+</StarlightPage>
+
+<script>
+  // Put this site's real address into the download commands.
+  document.querySelectorAll<HTMLElement>('[data-origin-template]').forEach((pre) => {
+    pre.textContent = (pre.textContent ?? '').replaceAll('ORIGIN', location.origin);
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-copy-pre]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const text = btn.parentElement?.querySelector('pre')?.textContent ?? '';
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Copied ✓';
+        setTimeout(() => (btn.textContent = 'Copy'), 1500);
+      } catch {
+        window.prompt('Copy this:', text);
+      }
+    });
+  });
+</script>
+
+<style>
+  .dl {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+  .dl__warn a {
+    color: inherit;
+  }
+  .dl__how {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  }
+  .dl__how li {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .dl__how span {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+    font-size: var(--sl-text-xs);
+    font-weight: 800;
+  }
+  .dl__how p {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+  .dl__card {
+    padding: 1.4rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 1.1rem;
+    background: var(--cp-card);
+    box-shadow: var(--cp-shadow);
+    scroll-margin-top: calc(var(--sl-nav-height) + 1rem);
+  }
+  .dl__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .dl__title {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-2xl);
+    font-weight: 750;
+  }
+  .dl__works {
+    margin: 0.2rem 0 0;
+    color: var(--sl-color-gray-2);
+  }
+  .dl__tested {
+    margin: 0.75rem 0 1rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+  .dl__files {
+    display: grid;
+    gap: 0.6rem;
+  }
+  .dl__file {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-black);
+  }
+  .dl__file-info {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+  .dl__file-name {
+    color: var(--sl-color-white);
+    font-weight: 700;
+  }
+  .dl__file-meta {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .dl__hash {
+    color: var(--sl-color-gray-3);
+    font-size: 0.68rem;
+    overflow-wrap: anywhere;
+  }
+  .dl__hash code {
+    font-size: inherit;
+  }
+  .dl__file-actions {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .dl__label {
+    margin: 1.25rem 0 0.4rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .dl__term {
+    position: relative;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-black);
+  }
+  .dl__term pre {
+    margin: 0;
+    padding: 0.85rem 5rem 0.85rem 1rem;
+    overflow-x: auto;
+    color: var(--sl-color-white);
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-xs);
+    line-height: 1.7;
+  }
+  .dl__term button {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+  }
+  .dl__more {
+    margin-top: 1rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+  .dl__more summary {
+    color: var(--sl-color-accent);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .dl__more p {
+    margin: 0.5rem 0;
+  }
+  .dl__foot {
+    margin-top: 0.5rem;
+  }
+</style>

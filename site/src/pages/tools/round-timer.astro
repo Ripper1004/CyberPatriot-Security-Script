@@ -1,0 +1,588 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+// The phases from docs/start-here/round-game-plan.md, in minutes of a 4-hour round.
+// For other lengths they are scaled to fit.
+const phases = [
+  {
+    start: 0,
+    end: 15,
+    title: 'Read the README and snapshot',
+    text: 'Read the README twice. Write down admins, users, critical services and prohibited items. Take a VMware snapshot.',
+    link: '/start-here/reading-the-readme/',
+  },
+  {
+    start: 15,
+    end: 45,
+    title: 'Forensics questions',
+    text: 'Answer as many as you can before changing anything. Skip any that take more than 10 minutes.',
+    link: '/guides/forensics-questions/',
+  },
+  {
+    start: 45,
+    end: 60,
+    title: 'Start updates, run the audit',
+    text: 'Start updates in the background. Run the script in Audit mode to get a to-do list.',
+    link: '/start-here/using-the-scripts/',
+  },
+  {
+    start: 60,
+    end: 150,
+    title: 'Work the checklist',
+    text: 'Users → passwords → firewall → services → software → files → OS settings → critical services. Check the Scoring Report after every few fixes.',
+    link: '/#checklists',
+  },
+  {
+    start: 150,
+    end: 210,
+    title: 'Backdoors and harder items',
+    text: 'Hunt for backdoors, do the harder checklist items, finish leftover forensics, update applications.',
+    link: '/guides/things-that-lose-points/',
+  },
+  {
+    start: 210,
+    end: 230,
+    title: 'Final checks',
+    text: 'Are critical services still working? Any penalties on the Scoring Report? Fix them.',
+    link: '/start-here/round-game-plan/',
+  },
+  {
+    start: 230,
+    end: 240,
+    title: 'Stop risky changes',
+    text: 'No more risky changes. Make sure the Scoring Report shows your latest score.',
+    link: '/start-here/round-game-plan/',
+  },
+];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Round timer',
+    description:
+      'A countdown for practice rounds that shows which phase of the round game plan you should be in. Works on a projector.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="rt cp-wide not-content" data-rt data-phases={JSON.stringify(phases)}>
+    <section class="rt__panel" data-rt-panel>
+      <div class="rt__clock-wrap">
+        <svg class="rt__ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="rt__ring-bg" cx="60" cy="60" r="54" pathLength="1000"></circle>
+          <circle class="rt__ring-fill" cx="60" cy="60" r="54" pathLength="1000" data-rt-ring></circle>
+        </svg>
+        <div class="rt__center">
+          <p class="rt__state" data-rt-state>Ready</p>
+          <p class="rt__clock" data-rt-clock role="timer" aria-live="off">4:00:00</p>
+          <p class="rt__sub" data-rt-sub>left of 4:00:00</p>
+        </div>
+      </div>
+
+      <div class="rt__now" data-rt-now>
+        <p class="rt__now-label">Right now</p>
+        <p class="rt__now-title" data-rt-now-title>Press Start when the round begins</p>
+        <p class="rt__now-text" data-rt-now-text>The timer keeps running if you close this tab or refresh.</p>
+        <p class="rt__now-next" data-rt-next></p>
+      </div>
+
+      <div class="rt__controls">
+        <button type="button" class="cp-btn cp-btn--primary rt__main" data-rt-toggle>Start</button>
+        <button type="button" class="cp-btn" data-rt-reset>Reset</button>
+        <button type="button" class="cp-btn" data-rt-full>Full screen</button>
+      </div>
+    </section>
+
+    <section class="rt__settings" aria-label="Timer settings">
+      <div class="cp-field">
+        <span class="cp-label" id="rt-len-label">Round length</span>
+        <div class="cp-segmented" role="group" aria-labelledby="rt-len-label" data-rt-lengths>
+          <button type="button" data-min="30" aria-pressed="false">30 min</button>
+          <button type="button" data-min="60" aria-pressed="false">1 h</button>
+          <button type="button" data-min="120" aria-pressed="false">2 h</button>
+          <button type="button" data-min="240" aria-pressed="true">4 h</button>
+          <button type="button" data-min="360" aria-pressed="false">6 h</button>
+        </div>
+        <p class="cp-hint">Shorter lengths squeeze the same phases into less time, good for class periods.</p>
+      </div>
+      <div class="rt__toggles">
+        <label class="rt__check"><input type="checkbox" data-rt-sound checked /> Beep when a new phase starts</label>
+        <label class="rt__check"><input type="checkbox" data-rt-notify /> Show a notification (even in another tab)</label>
+      </div>
+    </section>
+
+    <section aria-labelledby="rt-plan">
+      <h2 id="rt-plan" class="rt__h">The plan</h2>
+      <ol class="rt__phases" data-rt-phases>
+        {
+          phases.map((p, i) => (
+            <li class="rt__phase" data-i={i}>
+              <span class="rt__phase-time" data-rt-time />
+              <div>
+                <p class="rt__phase-title">
+                  <a href={p.link}>{p.title}</a>
+                </p>
+                <p class="rt__phase-text">{p.text}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+  </div>
+</StarlightPage>
+
+<script>
+  import { getValue, setValue } from '../../scripts/store';
+
+  interface Phase {
+    start: number;
+    end: number;
+    title: string;
+    text: string;
+  }
+  interface TimerState {
+    minutes: number;
+    /** epoch ms when the timer reaches 0 (running) */
+    endAt: number | null;
+    /** ms left while paused */
+    remaining: number | null;
+  }
+
+  const root = document.querySelector<HTMLElement>('[data-rt]')!;
+  const phases: Phase[] = JSON.parse(root.dataset.phases as string);
+  const q = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const ui = {
+    clock: q('[data-rt-clock]'),
+    state: q('[data-rt-state]'),
+    sub: q('[data-rt-sub]'),
+    ring: q('[data-rt-ring]'),
+    nowTitle: q('[data-rt-now-title]'),
+    nowText: q('[data-rt-now-text]'),
+    next: q('[data-rt-next]'),
+    toggle: q<HTMLButtonElement>('[data-rt-toggle]'),
+    reset: q<HTMLButtonElement>('[data-rt-reset]'),
+    full: q<HTMLButtonElement>('[data-rt-full]'),
+    lengths: q('[data-rt-lengths]'),
+    sound: q<HTMLInputElement>('[data-rt-sound]'),
+    notify: q<HTMLInputElement>('[data-rt-notify]'),
+    phaseList: [...root.querySelectorAll<HTMLElement>('.rt__phase')],
+    panel: q('[data-rt-panel]'),
+  };
+
+  let state: TimerState = getValue<TimerState>('timer', { minutes: 240, endAt: null, remaining: null });
+  let lastPhase = -2;
+  const baseTitle = document.title;
+
+  const totalMs = () => state.minutes * 60_000;
+  const leftMs = () =>
+    state.endAt !== null ? Math.max(0, state.endAt - Date.now()) : state.remaining !== null ? state.remaining : totalMs();
+  const running = () => state.endAt !== null && leftMs() > 0;
+  const started = () => state.endAt !== null || state.remaining !== null;
+  const scale = () => state.minutes / 240;
+
+  function fmt(ms: number) {
+    const s = Math.ceil(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+  const fmtMin = (min: number) => `${Math.floor(min / 60)}:${String(Math.round(min % 60)).padStart(2, '0')}`;
+
+  function save() {
+    setValue('timer', state);
+  }
+
+  function phaseIndex(elapsedMin: number) {
+    const k = scale();
+    return phases.findIndex((p) => elapsedMin >= p.start * k && elapsedMin < p.end * k);
+  }
+
+  function beep() {
+    if (!ui.sound.checked) return;
+    try {
+      const ctx = new AudioContext();
+      [0, 0.25].forEach((t) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.2);
+        o.connect(g).connect(ctx.destination);
+        o.start(ctx.currentTime + t);
+        o.stop(ctx.currentTime + t + 0.22);
+      });
+    } catch {
+      /* no audio */
+    }
+  }
+
+  function notify(title: string, body: string) {
+    if (!ui.notify.checked || !('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      new Notification(title, { body });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function render() {
+    const left = leftMs();
+    const total = totalMs();
+    const elapsedMin = (total - left) / 60_000;
+    const done = started() && left <= 0;
+    ui.clock.textContent = fmt(left);
+    ui.sub.textContent = `left of ${fmt(total)}`;
+    ui.ring.style.strokeDashoffset = String(1000 * (1 - left / total));
+    ui.state.textContent = done ? 'Time!' : running() ? 'Running' : started() ? 'Paused' : 'Ready';
+    root.classList.toggle('is-running', running());
+    root.classList.toggle('is-done', done);
+    root.classList.toggle('is-low', !done && started() && left < 10 * 60_000);
+    ui.toggle.textContent = running() ? 'Pause' : started() && !done ? 'Resume' : 'Start';
+    ui.toggle.disabled = done;
+    document.title = started() ? `${done ? 'Time!' : fmt(left)} · ${baseTitle}` : baseTitle;
+
+    const k = scale();
+    ui.phaseList.forEach((li, i) => {
+      const p = phases[i];
+      li.querySelector('[data-rt-time]')!.textContent = `${fmtMin(p.start * k)}–${fmtMin(p.end * k)}`;
+    });
+
+    const idx = started() ? (done ? phases.length : phaseIndex(elapsedMin)) : -1;
+    ui.phaseList.forEach((li, i) => {
+      li.classList.toggle('is-current', i === idx);
+      li.classList.toggle('is-past', idx >= 0 && i < idx);
+    });
+    if (done) {
+      ui.nowTitle.textContent = 'Round over';
+      ui.nowText.textContent = 'Check your final score and write down what you learned.';
+      ui.next.textContent = '';
+    } else if (idx >= 0) {
+      const p = phases[idx];
+      ui.nowTitle.textContent = p.title;
+      ui.nowText.textContent = p.text;
+      const next = phases[idx + 1];
+      const nextIn = (p.end * k - elapsedMin) * 60_000;
+      ui.next.textContent = next ? `Next: ${next.title} in ${fmt(nextIn)}` : 'Last phase';
+    } else {
+      ui.nowTitle.textContent = 'Press Start when the round begins';
+      ui.nowText.textContent = 'The timer keeps running if you close this tab or refresh.';
+      ui.next.textContent = '';
+    }
+
+    if (running() && lastPhase !== -2 && idx !== lastPhase) {
+      if (idx >= 0 && idx < phases.length) {
+        beep();
+        notify(`New phase: ${phases[idx].title}`, phases[idx].text);
+      }
+    }
+    if (done && lastPhase !== phases.length && lastPhase !== -2) {
+      beep();
+      notify('Time!', 'The round is over.');
+    }
+    lastPhase = idx;
+
+    ui.lengths.querySelectorAll('button').forEach((b) => {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.min) === state.minutes));
+      b.disabled = started();
+    });
+  }
+
+  ui.toggle.addEventListener('click', () => {
+    if (running()) state = { ...state, remaining: leftMs(), endAt: null };
+    else state = { ...state, endAt: Date.now() + leftMs(), remaining: null };
+    save();
+    render();
+  });
+  ui.reset.addEventListener('click', () => {
+    if (started() && !confirm('Reset the timer?')) return;
+    state = { minutes: state.minutes, endAt: null, remaining: null };
+    lastPhase = -1;
+    save();
+    render();
+  });
+  ui.lengths.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-min]');
+    if (!b || started()) return;
+    state = { minutes: Number(b.dataset.min), endAt: null, remaining: null };
+    save();
+    render();
+  });
+  ui.full.addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else root.requestFullscreen?.().catch(() => {});
+  });
+  document.addEventListener('fullscreenchange', () => {
+    ui.full.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+  });
+  ui.notify.addEventListener('change', async () => {
+    if (ui.notify.checked && 'Notification' in window && Notification.permission === 'default') {
+      const p = await Notification.requestPermission();
+      if (p !== 'granted') ui.notify.checked = false;
+    } else if (ui.notify.checked && (!('Notification' in window) || Notification.permission === 'denied')) {
+      ui.notify.checked = false;
+      alert('Notifications are blocked in this browser.');
+    }
+    setValue('timer-notify', ui.notify.checked);
+  });
+  ui.sound.addEventListener('change', () => setValue('timer-sound', ui.sound.checked));
+  ui.sound.checked = getValue('timer-sound', true);
+  ui.notify.checked = getValue('timer-notify', false) && 'Notification' in window && Notification.permission === 'granted';
+
+  render();
+  lastPhase = started() ? lastPhase : -1;
+  setInterval(render, 250);
+  // Another tab changed the timer
+  window.addEventListener('storage', () => {
+    state = getValue<TimerState>('timer', state);
+    render();
+  });
+</script>
+
+<style>
+  .rt {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+  .rt__panel {
+    display: grid;
+    gap: 1.5rem;
+    align-items: center;
+    padding: 1.75rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 1.25rem;
+    background: var(--cp-card);
+    box-shadow: var(--cp-shadow);
+  }
+  @media (min-width: 52rem) {
+    .rt__panel {
+      grid-template-columns: auto 1fr;
+    }
+    .rt__controls {
+      grid-column: 1 / -1;
+    }
+  }
+  .rt__clock-wrap {
+    position: relative;
+    width: min(18rem, 70vw);
+    aspect-ratio: 1;
+    margin-inline: auto;
+  }
+  .rt__ring {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+  .rt__ring circle {
+    fill: none;
+    stroke-width: 7;
+  }
+  .rt__ring-bg {
+    stroke: var(--sl-color-gray-5);
+  }
+  .rt__ring-fill {
+    stroke: var(--sl-color-accent);
+    stroke-dasharray: 1000;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.25s linear;
+  }
+  .is-low .rt__ring-fill {
+    stroke: var(--cp-warn);
+  }
+  .is-done .rt__ring-fill {
+    stroke: var(--cp-danger);
+  }
+  .rt__center {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    text-align: center;
+  }
+  .rt__center p {
+    margin: 0;
+  }
+  .rt__state {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .is-running .rt__state {
+    color: var(--cp-success);
+  }
+  .rt__clock {
+    color: var(--sl-color-white);
+    font-size: clamp(2.2rem, 7vw, 3.2rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+  .rt__sub {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .rt__now p {
+    margin: 0;
+  }
+  .rt__now-label {
+    color: var(--sl-color-accent);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .rt__now-title {
+    margin-top: 0.3rem !important;
+    color: var(--sl-color-white);
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .rt__now-text {
+    margin-top: 0.6rem !important;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-lg);
+    line-height: 1.5;
+  }
+  .rt__now-next {
+    margin-top: 0.85rem !important;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+  .rt__controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+  .rt__main {
+    min-width: 9rem;
+    min-height: 3rem;
+    font-size: var(--sl-text-base);
+  }
+  .rt__settings {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    padding: 1.1rem 1.25rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .cp-segmented button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .rt__toggles {
+    display: grid;
+    gap: 0.5rem;
+    padding-top: 1.6rem;
+  }
+  .rt__check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+  .rt__check input {
+    accent-color: var(--sl-color-accent);
+  }
+  .rt__h {
+    margin: 0 0 0.75rem;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-xl);
+  }
+  .rt__phases {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rt__phase {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--cp-card);
+  }
+  @media (max-width: 30rem) {
+    .rt__phase {
+      grid-template-columns: 1fr;
+      gap: 0.25rem;
+    }
+  }
+  .rt__phase p {
+    margin: 0;
+  }
+  .rt__phase-time {
+    color: var(--sl-color-accent);
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+  .rt__phase-title {
+    font-weight: 700;
+  }
+  .rt__phase-title a {
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+  .rt__phase-title a:hover {
+    text-decoration: underline;
+  }
+  .rt__phase-text {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+  .rt__phase.is-current {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-color-accent) 18%, transparent);
+  }
+  .rt__phase.is-past {
+    opacity: 0.55;
+  }
+  .rt__phase.is-past .rt__phase-title a::before {
+    content: '✓ ';
+    color: var(--cp-success);
+  }
+
+  /* Full screen (projector) mode */
+  .rt:fullscreen {
+    padding: 3vw;
+    overflow: auto;
+    background: var(--sl-color-black);
+  }
+  .rt:fullscreen .rt__settings,
+  .rt:fullscreen section:last-child {
+    display: none;
+  }
+  .rt:fullscreen .rt__panel {
+    min-height: 90vh;
+  }
+  .rt:fullscreen .rt__clock-wrap {
+    width: min(42vh, 40vw);
+  }
+  .rt:fullscreen .rt__clock {
+    font-size: 6vh;
+  }
+  .rt:fullscreen .rt__now-title {
+    font-size: 5vh;
+  }
+  .rt:fullscreen .rt__now-text {
+    font-size: 2.6vh;
+  }
+</style>

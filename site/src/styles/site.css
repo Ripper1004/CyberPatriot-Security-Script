@@ -1,0 +1,646 @@
+/* Shared components for the CP Practice Toolkit site. */
+
+
+body {
+  text-rendering: optimizeLegibility;
+}
+/* Soft glow behind the home page hero */
+:root[data-has-hero] body {
+  background-image: var(--cp-glow);
+  background-repeat: no-repeat;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 2px;
+}
+
+/* Headings a little tighter and heavier */
+.sl-markdown-content :is(h2, h3):not(:where(.not-content *)) {
+  letter-spacing: -0.01em;
+}
+.sl-markdown-content h2:not(:where(.not-content *)) {
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--cp-border);
+}
+
+/* Tables: scroll on small screens, zebra rows */
+.sl-markdown-content table {
+  display: block;
+  overflow-x: auto;
+  border-radius: var(--cp-radius-sm);
+}
+.sl-markdown-content tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--sl-color-gray-6) 55%, transparent);
+}
+
+/* ---------------------------------------------------------------- buttons */
+.cp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-card);
+  color: var(--sl-color-white);
+  font: inherit;
+  font-size: var(--sl-text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.1s;
+}
+.cp-btn:hover {
+  border-color: var(--sl-color-accent);
+  background: var(--cp-card-hover);
+  color: var(--sl-color-white);
+}
+.cp-btn:active {
+  transform: translateY(1px);
+}
+.cp-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cp-btn--primary {
+  background: var(--sl-color-accent);
+  border-color: var(--sl-color-accent);
+  color: var(--sl-color-black);
+}
+.cp-btn--primary:hover {
+  background: var(--sl-color-accent-high);
+  border-color: var(--sl-color-accent-high);
+  color: var(--sl-color-black);
+}
+.cp-btn--ghost {
+  background: transparent;
+}
+.cp-btn--danger:hover {
+  border-color: var(--cp-danger);
+  color: var(--cp-danger);
+}
+.cp-btn--sm {
+  min-height: 2.1rem;
+  padding: 0.35rem 0.8rem;
+  font-size: var(--sl-text-xs);
+}
+.cp-btn[aria-pressed='true'] {
+  border-color: var(--sl-color-accent);
+  background: var(--sl-color-accent-low);
+}
+
+/* ---------------------------------------------------------------- pills */
+.cp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.12rem 0.6rem;
+  border-radius: 999px;
+  background: var(--sl-color-accent-low);
+  color: var(--sl-color-accent-high);
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cp-pill--muted {
+  background: var(--sl-color-gray-6);
+  color: var(--sl-color-gray-2);
+}
+.cp-pill--success {
+  background: var(--cp-success-low);
+  color: var(--cp-success);
+}
+.cp-pill--warn {
+  background: var(--cp-warn-low);
+  color: var(--cp-warn);
+}
+.cp-pill--danger {
+  background: var(--cp-danger-low);
+  color: var(--cp-danger);
+}
+
+/* ---------------------------------------------------------------- cards */
+.cp-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  background: var(--cp-card);
+  box-shadow: var(--cp-shadow);
+  color: var(--sl-color-gray-2);
+}
+a.cp-card {
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    transform 0.15s,
+    background-color 0.15s;
+}
+a.cp-card:hover {
+  border-color: var(--sl-color-accent);
+  background: var(--cp-card-hover);
+  transform: translateY(-2px);
+}
+.cp-card__title {
+  margin: 0;
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-lg);
+  font-weight: 700;
+  line-height: 1.25;
+}
+.cp-card__text {
+  margin: 0;
+  font-size: var(--sl-text-sm);
+  line-height: 1.5;
+}
+.cp-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr));
+}
+
+/* ---------------------------------------------------------------- progress bars */
+.cp-bar {
+  position: relative;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--sl-color-gray-5);
+  overflow: hidden;
+}
+.cp-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--cp-gradient);
+  transition: width 0.35s ease;
+}
+.is-complete .cp-bar__fill,
+.cp-bar.is-complete .cp-bar__fill {
+  background: var(--cp-success);
+}
+
+/* ---------------------------------------------------------------- checklist header */
+.cp-cl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin-top: 0.85rem;
+  font-size: var(--sl-text-sm);
+}
+.cp-cl-meta__item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--sl-color-gray-2);
+}
+.cp-cl-meta__label {
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cp-cl-meta__link {
+  text-decoration: none;
+}
+.cp-cl-meta__link:hover code {
+  border-color: var(--sl-color-accent);
+}
+.cp-cl-meta code {
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--cp-border);
+  border-radius: 0.35rem;
+  font-size: var(--sl-text-xs);
+}
+
+.cp-progress {
+  margin-top: 1.25rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  background: var(--cp-card);
+  box-shadow: var(--cp-shadow);
+}
+.cp-progress.is-complete {
+  border-color: var(--cp-success);
+}
+.cp-progress__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.55rem;
+}
+.cp-progress__count,
+.cp-progress__pct {
+  margin: 0;
+  color: var(--sl-color-gray-2);
+}
+.cp-progress__count strong {
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-xl);
+}
+.cp-progress__pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cp-progress__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+.cp-progress__note {
+  margin: 0.75rem 0 0;
+  color: var(--cp-warn);
+  font-size: var(--sl-text-xs);
+}
+
+/* Thin progress line under the top bar on checklist pages */
+.cp-topbar {
+  position: fixed;
+  z-index: 11;
+  top: var(--sl-nav-height);
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: transparent;
+  pointer-events: none;
+}
+.cp-topbar__fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--cp-gradient);
+  transition: width 0.35s ease;
+}
+
+/* ---------------------------------------------------------------- step blocks */
+.sl-markdown-content .cp-block {
+  position: relative;
+  margin-top: 1.75rem;
+  padding: 0.25rem 0 0.25rem 1.1rem;
+  border-left: 3px solid var(--sl-color-gray-5);
+  transition:
+    border-color 0.2s,
+    opacity 0.2s;
+}
+.sl-markdown-content .cp-block > :first-child {
+  margin-top: 0;
+}
+.sl-markdown-content .cp-block.is-done {
+  border-left-color: var(--cp-success);
+}
+.sl-markdown-content .cp-block.is-done > :not(.sl-heading-wrapper, .cp-step) {
+  opacity: 0.62;
+}
+.sl-markdown-content .cp-block.is-done .sl-heading-wrapper h3::before {
+  content: '✓ ';
+  color: var(--cp-success);
+}
+.sl-markdown-content .cp-hide-done .cp-block.is-done,
+.sl-markdown-content .cp-hide-done .cp-li-step.is-done {
+  display: none;
+}
+
+.sl-markdown-content .cp-step {
+  margin-top: 0.6rem;
+}
+.cp-step__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.9rem 0.4rem 0.6rem;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-card);
+  color: var(--sl-color-gray-2);
+  font-size: var(--sl-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.cp-step__label:hover {
+  border-color: var(--sl-color-accent);
+}
+.cp-step__box {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0;
+  accent-color: var(--cp-success);
+  cursor: pointer;
+}
+.cp-block.is-done .cp-step__label {
+  border-color: var(--cp-success);
+  background: var(--cp-success-low);
+  color: var(--cp-success);
+}
+
+/* Inline task-list steps */
+.sl-markdown-content .cp-li-step {
+  cursor: pointer;
+}
+.sl-markdown-content .cp-li-step input {
+  vertical-align: -0.15em;
+  margin-inline-end: 0.35rem;
+}
+.sl-markdown-content .cp-li-step.is-done {
+  color: var(--sl-color-gray-3);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--sl-color-gray-3) 60%, transparent);
+}
+
+.cp-flash {
+  animation: cp-flash 1.6s ease;
+}
+@keyframes cp-flash {
+  0%,
+  40% {
+    background: var(--sl-color-accent-low);
+  }
+  100% {
+    background: transparent;
+  }
+}
+.cp-pop .cp-step__label {
+  animation: cp-pop 0.35s ease;
+}
+@keyframes cp-pop {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+/* Section counters added to the "On this page" list */
+.cp-toc-count {
+  display: inline-block;
+  margin-inline-start: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--sl-color-gray-6);
+  color: var(--sl-color-gray-3);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  vertical-align: 0.05em;
+}
+.cp-toc-count.is-complete {
+  background: var(--cp-success-low);
+  color: var(--cp-success);
+}
+
+/* ---------------------------------------------------------------- lessons */
+.cp-lesson-chip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+}
+.cp-lesson-chip > span:not(:first-child)::before {
+  content: '·';
+  margin-inline-end: 0.5rem;
+}
+.cp-lesson-chip__n {
+  color: var(--sl-color-accent);
+  font-weight: 700;
+}
+.cp-lesson-chip__state {
+  color: var(--cp-success);
+  font-weight: 600;
+}
+.cp-lesson-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 3rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  background: var(--cp-card);
+}
+.cp-lesson-done.is-read {
+  border-color: var(--cp-success);
+}
+.cp-lesson-done p {
+  margin: 0;
+}
+.cp-lesson-done__title {
+  color: var(--sl-color-white);
+  font-weight: 700;
+}
+.cp-lesson-done__text {
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+}
+.cp-lesson-done__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ---------------------------------------------------------------- forms (tools) */
+.cp-field {
+  display: grid;
+  gap: 0.35rem;
+}
+.cp-field + .cp-field {
+  margin-top: 1rem;
+}
+.cp-label {
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-sm);
+  font-weight: 650;
+}
+.cp-hint {
+  margin: 0;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-xs);
+  line-height: 1.45;
+}
+.cp-input,
+.cp-select,
+.cp-textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-sm);
+  background: var(--sl-color-black);
+  color: var(--sl-color-white);
+  font: inherit;
+  font-size: var(--sl-text-sm);
+}
+.cp-textarea {
+  min-height: 6rem;
+  resize: vertical;
+  font-family: var(--sl-font-mono);
+  font-size: var(--sl-text-xs);
+}
+.cp-input:focus,
+.cp-select:focus,
+.cp-textarea:focus {
+  outline: none;
+  border-color: var(--sl-color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-color-accent) 25%, transparent);
+}
+
+.cp-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--sl-color-black);
+}
+.cp-segmented button {
+  padding: 0.4rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sl-color-gray-2);
+  font: inherit;
+  font-size: var(--sl-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.cp-segmented button[aria-pressed='true'] {
+  background: var(--sl-color-accent);
+  color: var(--sl-color-black);
+}
+
+.cp-callout {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--cp-border);
+  border-left: 4px solid var(--sl-color-accent);
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-card);
+  color: var(--sl-color-gray-2);
+  font-size: var(--sl-text-sm);
+}
+.cp-callout--warn {
+  border-left-color: var(--cp-warn);
+}
+.cp-callout--danger {
+  border-left-color: var(--cp-danger);
+}
+.cp-callout--success {
+  border-left-color: var(--cp-success);
+}
+.cp-callout p {
+  margin: 0;
+}
+.cp-callout p + p {
+  margin-top: 0.35rem;
+}
+
+.cp-section-title {
+  margin: 0 0 0.35rem;
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-2xl);
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+.cp-section-sub {
+  margin: 0 0 1.25rem;
+  color: var(--sl-color-gray-3);
+}
+
+.cp-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Sidebar badges: quieter, same font as the text */
+.sidebar-content .sl-badge {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--cp-border);
+  background: transparent;
+  color: var(--sl-color-gray-3);
+  font-family: var(--sl-font);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.sidebar-content a[aria-current='page'] .sl-badge {
+  border-color: currentColor;
+  color: inherit;
+}
+
+/* No programming ligatures: beginners must see exactly what to type (>= not ≥) */
+code,
+kbd,
+pre,
+.expressive-code {
+  font-variant-ligatures: none;
+  font-feature-settings:
+    'liga' 0,
+    'calt' 0;
+}
+
+/* Step headings inside checklists: a bit smaller than normal h3 */
+.sl-markdown-content .cp-block h3 {
+  font-size: clamp(1.2rem, 2.2vw, 1.45rem);
+}
+
+/* The hidden attribute always wins over component display rules */
+[hidden] {
+  display: none !important;
+}
+
+/* Tool pages that need more room than reading pages */
+html:has(.cp-wide) {
+  --sl-content-width: 64rem;
+}
+
+/* Segmented controls: don't stretch inside grid fields, wrap neatly */
+.cp-field > .cp-segmented {
+  justify-self: start;
+}
+.cp-segmented {
+  border-radius: 0.9rem;
+}
+.cp-segmented button {
+  border-radius: 0.65rem;
+}
+
+/* Fieldset legends sit inside their card */
+fieldset > legend {
+  float: left;
+  width: 100%;
+}
+fieldset > legend + * {
+  clear: both;
+}
