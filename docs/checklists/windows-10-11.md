@@ -8,6 +8,7 @@ Windows 11 is in **Round 1 and Round 2** this season. Windows 10 is the same exc
 - New to PowerShell? Read [PowerShell basics](../start-here/powershell-basics.md) first.
 - The script `scripts/windows/Harden.ps1` does much of this automatically. Run it at [step 1.2](#12-fast-path-run-the-hardening-script) (after forensics), then skip every step marked **Script: ✅**. See [Using the scripts](../start-here/using-the-scripts.md).
 - `alice`, `bob` etc. are examples. **Use the names in your README.**
+- `secpol.msc`, `gpedit.msc` and `lusrmgr.msc` only exist on **Pro, Education and Enterprise** (competition images are one of these). To check, run `winver`. On **Home**, use the **Typing** commands instead.
 
 ---
 
@@ -56,7 +57,7 @@ Open each `Forensics Question N.txt` on the desktop, put your answer after `ANSW
 ```powershell
 Get-FileHash C:\Users\bob\Documents\file.txt -Algorithm SHA256     # hash a file
 Get-ChildItem C:\Users -Recurse -Force -Filter *secret* -ErrorAction SilentlyContinue   # find files by name
-Select-String -Path C:\Users\*\Documents\* -Pattern "password"     # find text inside files
+Get-ChildItem C:\Users -Recurse -File -Force -Include *.txt,*.csv,*.log,*.ps1,*.bat -ErrorAction SilentlyContinue | Select-String -Pattern "password"   # find text inside files
 [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('aGVsbG8='))   # decode base64
 ```
 More: [Forensics questions guide](../guides/forensics-questions.md).
@@ -76,7 +77,7 @@ More: [Forensics questions guide](../guides/forensics-questions.md).
 
 **Typing:**
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Harden.ps1 -Mode Audit -Config .\my-readme.psd1
+powershell -ExecutionPolicy Bypass -File .\Harden.ps1 -Mode Audit -Config .\my-readme.psd1   # no config file? leave out -Config .\my-readme.psd1 (on both lines)
 powershell -ExecutionPolicy Bypass -File .\Harden.ps1 -Mode Apply -Config .\my-readme.psd1
 Get-ChildItem C:\harden-toolkit\findings-*.txt      # your to-do lists, newest last
 notepad (Get-ChildItem C:\harden-toolkit\findings-*.txt | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
@@ -151,7 +152,11 @@ Add-LocalGroupMember -Group Users -Member erin
 Get-LocalGroupMember Administrators
 Remove-LocalGroupMember -Group Administrators -Member bob
 Add-LocalGroupMember -Group Administrators -Member alice
+net localgroup Administrators      # use this if Get-LocalGroupMember shows an error
 ```
+
+> [!CAUTION]
+> Never remove **yourself** (the account you are logged in as) from Administrators. You would lose your admin rights.
 
 ### 2.5 Check the other powerful groups
 - [ ] Done
@@ -162,7 +167,7 @@ Open these groups in `lusrmgr.msc` and remove anyone the README doesn't say shou
 **Backup Operators** (can read every file), **Power Users**, **Remote Desktop Users** (keep only if RDP is needed), **Remote Management Users**, **Hyper-V Administrators**, **Event Log Readers**, **Network Configuration Operators**.
 
 ```powershell
-foreach ($g in 'Backup Operators','Power Users','Remote Desktop Users','Remote Management Users','Hyper-V Administrators') {
+foreach ($g in 'Backup Operators','Power Users','Remote Desktop Users','Remote Management Users','Hyper-V Administrators','Event Log Readers','Network Configuration Operators') {
   "--- $g"; Get-LocalGroupMember $g -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name }
 ```
 
@@ -176,7 +181,7 @@ foreach ($g in 'Backup Operators','Power Users','Remote Desktop Users','Remote M
 **Typing:**
 ```powershell
 Disable-LocalUser -Name Guest
-Get-LocalUser Guest, DefaultAccount, WDAGUtilityAccount | Format-Table Name, Enabled
+Get-LocalUser | Where-Object { $_.SID -match '-50[0134]$' } | Format-Table Name, Enabled, SID   # finds them even if renamed
 ```
 The built-in **Administrator** should usually be disabled too, **unless you're logged in as it** or the README says to keep it.
 
@@ -193,6 +198,7 @@ The built-in **Administrator** should usually be disabled too, **unless you're l
 ```powershell
 Get-LocalUser | Where-Object { $_.Enabled } | Format-Table Name, PasswordExpires, UserMayChangePassword, PasswordRequired
 Set-LocalUser -Name bob -PasswordNeverExpires $false
+Set-LocalUser -Name bob -UserMayChangePassword $true
 net user bob /passwordreq:yes
 ```
 
@@ -234,6 +240,16 @@ Use 12+ characters with upper case, lower case, a number and a symbol. **Don't c
 net accounts /uniquepw:24 /maxpwage:90 /minpwage:1 /minpwlen:12
 ```
 
+**Typing (complexity on, reversible encryption off):**
+```powershell
+secedit /export /cfg $env:TEMP\secpol.inf /areas SECURITYPOLICY
+(Get-Content $env:TEMP\secpol.inf) -replace 'PasswordComplexity = 0', 'PasswordComplexity = 1' -replace 'ClearTextPassword = 1', 'ClearTextPassword = 0' | Set-Content $env:TEMP\secpol.inf -Encoding Unicode
+secedit /configure /db $env:TEMP\secpol.sdb /cfg $env:TEMP\secpol.inf /areas SECURITYPOLICY
+secedit /export /cfg $env:TEMP\check.inf /areas SECURITYPOLICY; Select-String 'PasswordComplexity|ClearTextPassword' $env:TEMP\check.inf
+```
+
+**Check it worked:** `net accounts` shows the numbers, and the last line above shows `PasswordComplexity = 1` and `ClearTextPassword = 0`.
+
 ### 3.2 Account Lockout Policy
 - [ ] Done
 
@@ -244,12 +260,15 @@ net accounts /uniquepw:24 /maxpwage:90 /minpwage:1 /minpwlen:12
 | Account lockout threshold | **5** invalid attempts (set this first) |
 | Account lockout duration | **30** minutes |
 | Reset account lockout counter after | **30** minutes |
-| Allow Administrator account lockout (Windows 11) | **Enabled** |
+| Allow Administrator account lockout (only on updated systems; skip it if it isn't in the list) | **Enabled** |
 
 ```powershell
 net accounts /lockoutthreshold:5 /lockoutduration:30 /lockoutwindow:30
 net accounts                     # check everything
 ```
+
+> [!CAUTION]
+> Never set **Account lockout duration** to **0**: that means a locked account stays locked until an admin unlocks it. Don't set the threshold below 3 either: a few typos would lock real users out.
 
 ---
 
@@ -262,7 +281,7 @@ net accounts                     # check everything
 
 **Why:** Without auditing there's no record of logins, account changes, or policy changes.
 
-**Clicking:** `secpol.msc` → **Local Policies → Audit Policy**. Set **every** item to **Success and Failure**.
+**Clicking:** `secpol.msc` → **Local Policies → Audit Policy**. Set **every** item to **Success and Failure**. The detailed version is under **Advanced Audit Policy Configuration → System Audit Policies**; the `auditpol` command below sets all of those at once.
 
 **Typing:**
 ```powershell
@@ -287,16 +306,30 @@ Also: **Security Options → Audit: Force audit policy subcategory settings… t
 | Allow log on through Remote Desktop Services | Administrators, Remote Desktop Users (or nobody if RDP isn't needed) |
 | Back up files and directories | Administrators, Backup Operators |
 | Create a token object | **No one** |
+| Create permanent shared objects | **No one** |
 | Debug programs | **Administrators** only |
 | Deny access to this computer from the network | **Guests** |
 | Deny log on locally | **Guests** |
 | Deny log on through Remote Desktop Services | **Guests** |
+| Force shutdown from a remote system | Administrators |
+| Impersonate a client after authentication | Administrators, LOCAL SERVICE, NETWORK SERVICE, SERVICE |
 | Load and unload device drivers | Administrators |
+| Lock pages in memory | **No one** |
 | Manage auditing and security log | Administrators |
+| Modify firmware environment values | Administrators |
+| Restore files and directories | Administrators, Backup Operators |
 | Take ownership of files or other objects | Administrators |
+
+**Typing (see every right at once):**
+```powershell
+secedit /export /areas USER_RIGHTS /cfg $env:TEMP\rights.inf
+Select-String '^Se' $env:TEMP\rights.inf
+```
+Accounts show as SIDs: `*S-1-1-0` = Everyone, `*S-1-5-32-545` = Users, `*S-1-5-32-546` = Guests, `*S-1-5-32-544` = Administrators. A long SID that starts with `S-1-5-21-` is one user account.
 
 > [!WARNING]
 > Look carefully at the **Deny** rights. A planted "Deny log on locally: **Users**" locks every normal user out.
+> Don't remove **LOCAL SERVICE**, **NETWORK SERVICE**, **SERVICE** or entries that start with `NT SERVICE\`: Windows needs them.
 
 ### 4.3 Security Options
 - [ ] Done
@@ -313,21 +346,55 @@ Also: **Security Options → Audit: Force audit policy subcategory settings… t
 | Interactive logon: Don't display last signed-in | **Enabled** |
 | Interactive logon: Machine inactivity limit | **900** seconds |
 | Interactive logon: Message title / text for users attempting to log on | A warning, e.g. "Authorized users only" |
+| Interactive logon: Number of previous logons to cache (in case domain controller is not available) | **4** or fewer |
 | Microsoft network client: Digitally sign communications (always) | **Enabled** |
+| Microsoft network client: Digitally sign communications (if server agrees) | **Enabled** |
 | Microsoft network client: Send unencrypted password to third-party SMB servers | **Disabled** |
 | Microsoft network server: Digitally sign communications (always) | **Enabled** |
+| Microsoft network server: Digitally sign communications (if client agrees) | **Enabled** |
 | Network access: Allow anonymous SID/Name translation | **Disabled** |
 | Network access: Do not allow anonymous enumeration of SAM accounts | **Enabled** |
 | Network access: Do not allow anonymous enumeration of SAM accounts and shares | **Enabled** |
 | Network access: Do not allow storage of passwords and credentials for network authentication | **Enabled** |
 | Network access: Let Everyone permissions apply to anonymous users | **Disabled** |
+| Network access: Restrict anonymous access to Named Pipes and Shares | **Enabled** |
+| Network access: Restrict clients allowed to make remote calls to SAM | **Administrators** only |
 | Network security: Do not store LAN Manager hash value on next password change | **Enabled** |
 | Network security: LAN Manager authentication level | **Send NTLMv2 response only. Refuse LM & NTLM** |
 | Shutdown: Allow system to be shut down without having to log on | **Disabled** |
+| System objects: Strengthen default permissions of internal system objects (e.g. Symbolic Links) | **Enabled** |
 | User Account Control: Admin Approval Mode for the Built-in Administrator account | **Enabled** |
 | User Account Control: Behavior of the elevation prompt for administrators… | **Prompt for consent on the secure desktop** |
+| User Account Control: Behavior of the elevation prompt for standard users | **Prompt for credentials on the secure desktop** |
+| User Account Control: Detect application installations and prompt for elevation | **Enabled** |
+| User Account Control: Only elevate UIAccess applications that are installed in secure locations | **Enabled** |
 | User Account Control: Run all administrators in Admin Approval Mode | **Enabled** |
 | User Account Control: Switch to the secure desktop when prompting for elevation | **Enabled** |
+| User Account Control: Virtualize file and registry write failures to per-user locations | **Enabled** |
+
+**Check it worked (a few of them):**
+```powershell
+Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\Lsa | Format-List LimitBlankPasswordUse, RestrictAnonymous, RestrictAnonymousSAM, NoLMHash, LmCompatibilityLevel
+```
+Wanted: `1`, `1`, `1`, `1`, `5`. A blank means the setting was never changed from the Windows default: set it in `secpol.msc`.
+
+### 4.4 PowerShell logging
+- [ ] Done
+
+**Script:** ✅ Done by the script (`audit` section).
+
+**What:** Windows records every PowerShell script and command that runs.
+**Why it matters:** Attackers love PowerShell. With logging on, their commands end up in the event log.
+
+**Clicking:** `gpedit.msc` → **Computer Configuration → Administrative Templates → Windows Components → Windows PowerShell**:
+- **Turn on PowerShell Script Block Logging** → **Enabled**
+- **Turn on Module Logging** → **Enabled** → **Show…** → add `*` as a module name
+
+**Check it worked:**
+```powershell
+Get-ItemProperty HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging -ErrorAction SilentlyContinue   # EnableScriptBlockLogging : 1
+Get-ItemProperty HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging -ErrorAction SilentlyContinue        # EnableModuleLogging : 1
+```
 
 ---
 
@@ -343,8 +410,9 @@ Also: **Security Options → Audit: Force audit policy subcategory settings… t
 **Typing:**
 ```powershell
 Get-MpComputerStatus | Format-List AntivirusEnabled, RealTimeProtectionEnabled, IsTamperProtected, AntivirusSignatureAge
-Set-MpPreference -DisableRealtimeMonitoring $false -PUAProtection Enabled -MAPSReporting Advanced
+Set-MpPreference -DisableRealtimeMonitoring $false -PUAProtection Enabled -MAPSReporting Advanced -SubmitSamplesConsent SendSafeSamples
 ```
+**Check it worked:** `RealTimeProtectionEnabled` and `IsTamperProtected` say `True`.
 
 ### 5.2 Remove planted exclusions
 - [ ] Done
@@ -367,6 +435,12 @@ Remove-MpPreference -ExclusionPath "C:\Users\Public\tools"
 **Script:** 🔎 The script deletes the registry values that turn Defender off, but a setting made in gpedit.msc can come back; still check gpedit.msc says Not configured.
 
 **Clicking:** **Win + R** → `gpedit.msc` → **Computer Configuration → Administrative Templates → Windows Components → Microsoft Defender Antivirus** → **Turn off Microsoft Defender Antivirus** must be **Not configured** (or Disabled). Check **Real-time Protection** in the same place.
+
+**Typing (check):**
+```powershell
+Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender' -ErrorAction SilentlyContinue                          # DisableAntiSpyware : 1 is bad
+Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection' -ErrorAction SilentlyContinue     # any Disable value of 1 is bad
+```
 
 ### 5.4 Update and scan
 - [ ] Done
@@ -426,14 +500,18 @@ Disable-NetFirewallRule -DisplayName "Evil Rule"
 
 **Script:** 🔎 The script sets automatic updates to option 4, removes update blocks and pauses, and re-enables the service; if updates were switched off in gpedit.msc, fix it there too.
 
-**Clicking:** `gpedit.msc` → **Computer Configuration → Administrative Templates → Windows Components → Windows Update** (on Windows 11: **→ Manage end user experience**) → **Configure Automatic Updates** → **Enabled**, option **4 – Auto download and schedule the install**.
+**Clicking:** `gpedit.msc` → **Computer Configuration → Administrative Templates → Windows Components → Windows Update** (on Windows 11 it is inside **Manage end user experience**; look there if you don't see it) → **Configure Automatic Updates** → **Enabled**, option **4 – Auto download and schedule the install**.
 
 **Typing (check):**
 ```powershell
 Get-Service wuauserv | Format-Table Name, Status, StartType        # StartType must not be Disabled
 Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -ErrorAction SilentlyContinue
 ```
-`NoAutoUpdate = 1` there means updates are switched off. Set it to `0`.
+`NoAutoUpdate : 1` there means updates are switched off. Fix it (and a disabled service) with:
+```powershell
+Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -Name NoAutoUpdate -Value 0
+Set-Service wuauserv -StartupType Manual
+```
 
 ### 7.3 Update the other programs
 - [ ] Done
@@ -462,8 +540,8 @@ Set-Service -Name RemoteRegistry -StartupType Disabled
 | Service (name) | Usually |
 |---|---|
 | Remote Registry (`RemoteRegistry`) | **Disable** |
-| Telnet (`TlntSvr`) | **Disable** |
-| SNMP Service (`SNMP`) | **Disable** |
+| Telnet server (`TlntSvr`, only on old images) | **Disable** |
+| SNMP Service (`SNMP`) and SNMP Trap (`SNMPTRAP`) | **Disable** |
 | SSDP Discovery (`SSDPSRV`) | Disable |
 | UPnP Device Host (`upnphost`) | Disable |
 | Microsoft FTP Service (`FTPSVC`) | Disable unless FTP is needed |
@@ -473,7 +551,15 @@ Set-Service -Name RemoteRegistry -StartupType Disabled
 | Internet Connection Sharing (`SharedAccess`) | Disable |
 | Print Spooler (`Spooler`) | Disable unless printing is needed |
 | Xbox services (`XblAuthManager`, `XblGameSave`, `XboxNetApiSvc`) | Disable |
+| Simple TCP/IP Services (`simptcp`) | **Disable** |
+| WebClient (`WebClient`) | Disable unless the README needs WebDAV |
+| Windows Media Player Network Sharing (`WMPNetworkSvc`) | Disable |
+| OpenSSH SSH Server (`sshd`) | Disable unless SSH is needed |
+| Windows Remote Management (`WinRM`) | Disable unless remote PowerShell is needed |
 | Remote-control tools (TeamViewer, AnyDesk, VNC) | Disable **and** uninstall |
+
+> [!CAUTION]
+> Never disable a service the README lists as critical, and leave services you don't recognise alone until you have looked them up. Disabling the wrong one (e.g. RPC, DCOM, Windows Event Log) can break the computer.
 
 ### 8.2 Make sure the security services are running
 - [ ] Done
@@ -481,6 +567,10 @@ Set-Service -Name RemoteRegistry -StartupType Disabled
 **Script:** ✅ Done by the script (`services` section).
 
 Windows Defender (`WinDefend`), Windows Defender Firewall (`mpssvc`), Windows Event Log (`EventLog`), Windows Update (`wuauserv`, Manual is fine), Security Center (`wscsvc`). None of these may be **Disabled**.
+
+```powershell
+Get-Service WinDefend, mpssvc, EventLog, wuauserv, wscsvc | Format-Table Name, Status, StartType
+```
 
 ---
 
@@ -503,9 +593,30 @@ Windows Defender (`WinDefend`), Windows Defender Firewall (`mpssvc`), Windows Ev
 ```powershell
 Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
 Disable-WindowsOptionalFeature -Online -FeatureName TelnetClient -NoRestart
+Disable-WindowsOptionalFeature -Online -FeatureName TFTP -NoRestart
 Disable-WindowsOptionalFeature -Online -FeatureName MicrosoftWindowsPowerShellV2Root -NoRestart
+Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
 Get-WindowsOptionalFeature -Online | Where-Object State -eq Enabled | Select-Object FeatureName
 ```
+An error saying a feature is unknown just means it isn't on this version (PowerShell 2.0 is gone from up-to-date Windows 11 24H2). Turning a feature off finishes at the next restart, so restart once near the end (see Final checks).
+
+**Check it worked:** `Get-SmbServerConfiguration | Select-Object EnableSMB1Protocol` says `False`, and the features above are not in the Enabled list.
+
+### 9.2 Optional features (OpenSSH Server, SNMP)
+- [ ] Done
+
+**Script:** 🔎 The script reports an installed OpenSSH Server that the README doesn't list, but it doesn't remove optional features; remove them yourself.
+
+**What:** Some extras are "optional features" instead of Windows features: **OpenSSH Server** and **SNMP** are the risky ones.
+**Clicking:** **Settings → System → Optional features** (older versions: **Settings → Apps → Optional features**) → click the feature → **Remove**. Keep it if the README needs it.
+
+**Typing:**
+```powershell
+Get-WindowsCapability -Online | Where-Object State -eq Installed | Select-Object Name
+Remove-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0   # skip if the README needs SSH
+Remove-WindowsCapability -Online -Name SNMP.Client~~~~0.0.1.0       # skip if the README needs SNMP
+```
+**Check it worked:** run the first line again: the removed names are gone.
 
 ---
 
@@ -518,14 +629,33 @@ Get-WindowsOptionalFeature -Online | Where-Object State -eq Enabled | Select-Obj
 
 **Clicking:** **Win + R** → `SystemPropertiesRemote` → untick **Allow Remote Assistance connections to this computer**.
 
+**Check it worked:**
+```powershell
+Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Remote Assistance' | Select-Object fAllowToGetHelp   # 0 = off
+```
+
 ### 10.2 Remote Desktop off (or secured)
 - [ ] Done
 
 **Script:** 🔎 The script keeps Remote Desktop on with NLA if your config lists rdp, otherwise turns it off (asks first); still check who is in Remote Desktop Users.
 
-**Not needed:** **Settings → System → Remote Desktop → Off**.
+> [!CAUTION]
+> If the README lists Remote Desktop as a critical service, **don't turn it off**: you lose points for breaking it.
 
-**Needed (README says so):** keep it on, but tick **Require devices to use Network Level Authentication to connect**, and make sure only the right users are in **Remote Desktop Users**.
+**Check:**
+```powershell
+Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server' | Select-Object fDenyTSConnections   # 1 = off, 0 = on
+```
+
+**Not needed:** **Settings → System → Remote Desktop → Off**, or:
+```powershell
+Set-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server' -Name fDenyTSConnections -Value 1
+```
+
+**Needed (README says so):** keep it on, but tick **Require devices to use Network Level Authentication to connect**, and make sure only the right users are in **Remote Desktop Users**. Or:
+```powershell
+Set-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name UserAuthentication -Value 1
+```
 
 ---
 
@@ -542,6 +672,8 @@ Get-WindowsOptionalFeature -Online | Where-Object State -eq Enabled | Select-Obj
 ```powershell
 Get-SmbShare
 Remove-SmbShare -Name Secret -Force
+Get-SmbShareAccess -Name Public                                    # for a share you keep: who can use it
+Revoke-SmbShareAccess -Name Public -AccountName Everyone -Force   # take Everyone off it
 ```
 > [!CAUTION]
 > Leave the built-in shares alone: **ADMIN$, C$, IPC$** (and **print$**).
@@ -565,7 +697,7 @@ Look for:
 
 **Typing (to see the list):**
 ```powershell
-Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*, HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* |
+Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*, HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*, HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* |
   Where-Object DisplayName | Sort-Object DisplayName | Format-Table DisplayName, DisplayVersion, Publisher
 ```
 
@@ -635,10 +767,10 @@ Get-ChildItem C:\Users -Recurse -Force -Include *password*,*creditcard*,*.pcap,*
 **Typing:**
 ```powershell
 Get-CimInstance Win32_StartupCommand | Format-Table Name, Command, Location -AutoSize
-Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Run, HKCU:\Software\Microsoft\Windows\CurrentVersion\Run
+Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Run, HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce, HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run, HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -ErrorAction SilentlyContinue
 Remove-ItemProperty -Path HKLM:\Software\Microsoft\Windows\CurrentVersion\Run -Name "Updater"
 ```
-Red flags: `powershell -enc ...`, `-WindowStyle Hidden`, `nc.exe`, `mshta`, `.vbs`/`.bat`/`.ps1` files, anything in `C:\Users\Public` or `Temp`.
+Red flags: `powershell -enc` followed by a long string, `-WindowStyle Hidden`, `nc.exe`, `mshta`, `.vbs`/`.bat`/`.ps1` files, anything in `C:\Users\Public` or `Temp`.
 
 ### 14.2 Scheduled tasks
 - [ ] Done
@@ -661,19 +793,21 @@ Unregister-ScheduledTask -TaskName "BadTask" -Confirm:$false
 
 ```powershell
 Get-CimInstance Win32_Service | Where-Object { $_.PathName -notmatch 'Windows\\|Program Files' } | Format-Table Name, State, PathName -AutoSize
+Stop-Service -Name BadService -Force; Set-Service -Name BadService -StartupType Disabled   # BadService = the bad one's Name
+sc.exe delete BadService            # only for a service you are sure is malware. Type sc.exe: in PowerShell, sc means something else
 ```
 
 ### 14.4 Sticky Keys / Utility Manager backdoor
 - [ ] Done
 
-**Script:** 🔎 The script removes Debugger hijacks and runs sfc on replaced tools (asks first); run the check commands above to confirm.
+**Script:** 🔎 The script removes Debugger hijacks and runs sfc on replaced tools (asks first); run the check commands below to confirm.
 
 **Why:** Replacing `sethc.exe` (press Shift 5 times) or `utilman.exe` (the accessibility button) with `cmd.exe` gives anyone a SYSTEM command prompt **at the login screen**.
 
 ```powershell
 Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options' |
   Where-Object { $_.GetValue('Debugger') } | ForEach-Object { "$($_.PSChildName) -> $($_.GetValue('Debugger'))" }
-(Get-Item C:\Windows\System32\sethc.exe).VersionInfo.OriginalFilename      # must be sethc.exe(.mui), not Cmd.Exe
+foreach ($f in 'sethc','utilman','osk','Magnify','Narrator') { "$f -> " + (Get-Item "C:\Windows\System32\$f.exe").VersionInfo.OriginalFilename }   # each must show its own name (.mui is fine), not Cmd.Exe
 ```
 **Fix:** delete the `Debugger` value. If the file itself was replaced, run `sfc /scanfile=C:\Windows\System32\sethc.exe`.
 
@@ -695,7 +829,7 @@ Only comment lines (starting with `#`) are normal. Delete lines that send real w
 ```powershell
 Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess, @{n='Process';e={(Get-Process -Id $_.OwningProcess).ProcessName}} | Sort-Object LocalPort
 ```
-`nc`, `ncat`, `powershell` or `python` listening on a port is a backdoor. Stop it (`Stop-Process -Id <PID> -Force`), then find what starts it (14.1–14.3).
+`nc`, `ncat`, `powershell` or `python` listening on a port is a backdoor. Stop it with `Stop-Process -Id 4242 -Force` (use the number from the `OwningProcess` column), then find what starts it (14.1–14.3).
 
 ---
 
@@ -708,12 +842,20 @@ Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess, @{n
 
 **Start** → type **Change User Account Control settings** → move the slider to the **top** (**Always notify**).
 
+**Check it worked:**
+```powershell
+Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System | Format-List EnableLUA, ConsentPromptBehaviorAdmin, PromptOnSecureDesktop
+```
+Wanted: `1`, `2`, `1`. If `EnableLUA` was `0`, UAC only comes back after a restart.
+
 ### 15.2 AutoPlay off
 - [ ] Done
 
 **Script:** 🔎 The script turns AutoRun and AutoPlay off for all drives by policy; also switch the Settings toggle off.
 
 **Settings → Bluetooth & devices → AutoPlay** (Windows 10: **Devices → AutoPlay**) → **Use AutoPlay for all media and devices: Off**.
+
+**Policy:** `gpedit.msc` → **Computer Configuration → Administrative Templates → Windows Components → AutoPlay Policies → Turn off Autoplay** → **Enabled**, **All drives**.
 
 ### 15.3 Screen saver with password
 - [ ] Done
@@ -729,6 +871,11 @@ Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess, @{n
 
 `gpedit.msc` → **Computer Configuration → Administrative Templates → Network → DNS Client → Turn off multicast name resolution → Enabled**.
 
+**Check it worked:**
+```powershell
+Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient' | Select-Object EnableMulticast   # must be 0
+```
+
 ### 15.5 SmartScreen on
 - [ ] Done
 
@@ -739,6 +886,35 @@ Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess, @{n
 > [!WARNING]
 > **Do not turn on BitLocker** on a practice image. Without the recovery key you can lock yourself out of the whole VM.
 
+### 15.6 WDigest off (no plain-text passwords in memory)
+- [ ] Done
+
+**Script:** ✅ Done by the script (`security` section).
+
+**Why it matters:** With WDigest on, Windows keeps logged-in users' passwords in memory as plain text, and tools like mimikatz can read them.
+
+**Typing:**
+```powershell
+$k = 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest'
+if (-not (Test-Path $k)) { New-Item -Path $k | Out-Null }
+Set-ItemProperty $k -Name UseLogonCredential -Value 0 -Type DWord
+Get-ItemProperty $k | Select-Object UseLogonCredential   # must be 0
+```
+
+### 15.7 NetBIOS over TCP/IP off
+- [ ] Done
+
+**Script:** ✅ Done by the script (`misc` section).
+
+**Why it matters:** Like LLMNR (15.4), attackers answer NetBIOS name lookups to steal password hashes.
+
+**Clicking:** **Win + R** → `ncpa.cpl` → right-click the network adapter → **Properties** → **Internet Protocol Version 4 (TCP/IPv4)** → **Properties** → **Advanced…** → **WINS** → **Disable NetBIOS over TCP/IP** → **OK**.
+
+**Check it worked:**
+```powershell
+Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE" | Select-Object Description, TcpipNetbiosOptions   # 2 = off
+```
+
 ---
 
 ## 16. Web browsers
@@ -748,7 +924,7 @@ Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess, @{n
 
 **Script:** ✅ Done by the script (`browsers` section).
 
-**⋯ → Settings → Privacy, search, and services** → **Microsoft Defender SmartScreen: On**, **Block potentially unwanted apps: On**. **Cookies and site permissions → Pop-ups and redirects → Block**.
+**⋯ → Settings → Privacy, search, and services** → **Microsoft Defender SmartScreen: On**, **Block potentially unwanted apps: On**. **Cookies and site permissions → Pop-ups and redirects → Block**. Update via **⋯ → Help and feedback → About Microsoft Edge**.
 
 ### 16.2 Firefox (if installed)
 - [ ] Done
@@ -785,4 +961,4 @@ If the README says this computer runs a website, FTP or file shares, harden them
 - [ ] Scoring Report shows **no penalties**
 - [ ] Forensics answers saved
 - [ ] Final snapshot
-- [ ] Reboot **once** at the end only if updates need it, then check the Scoring Report again
+- [ ] Reboot **once** at the end only if updates or Windows features (9.1) need it, then check the Scoring Report again
