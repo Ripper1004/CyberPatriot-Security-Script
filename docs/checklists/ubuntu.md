@@ -42,7 +42,7 @@ On Ubuntu 22.04+, Firefox is a **snap** package, so `apt` doesn't update it:
 ```bash
 snap list                       # every snap app
 sudo snap refresh               # update all snaps (including Firefox)
-sudo snap remove <name>         # remove a prohibited snap app
+sudo snap remove steam          # remove a prohibited snap app: change steam to the name from snap list
 ```
 
 ### Firewall: UFW is installed but OFF
