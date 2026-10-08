@@ -85,6 +85,13 @@ const script = SCRIPTS.find((s) => s.id === checklist?.script);
   <div class="cp-progress__actions">
     <button type="button" class="cp-btn cp-btn--primary cp-btn--sm" data-cp-action="next">Go to next step ↓</button>
     <button type="button" class="cp-btn cp-btn--sm" data-cp-action="hide" aria-pressed="false">Hide finished steps</button>
+    <button
+      type="button"
+      class="cp-btn cp-btn--sm"
+      data-cp-action="compact"
+      aria-pressed="false"
+      title="Hide the beginner explanations: keep commands, warnings and script tags">Compact view</button
+    >
     <button type="button" class="cp-btn cp-btn--sm" data-cp-action="print">Print</button>
     <button type="button" class="cp-btn cp-btn--sm cp-btn--ghost" data-cp-action="reset">Reset for a new image</button>
   </div>

@@ -76,6 +76,8 @@ function initSteps(content: HTMLElement) {
   const progress = document.querySelector<HTMLElement>('[data-cp-progress]');
   const hideBtn = progress?.querySelector<HTMLButtonElement>('[data-cp-action="hide"]');
   const hideKey = `hide-finished`;
+  const compactKey = `compact-view`;
+  markExplanations(content);
 
   const render = () => {
     const done = getDoneSteps(page);
@@ -101,6 +103,9 @@ function initSteps(content: HTMLElement) {
     const topFill = document.querySelector<HTMLElement>('[data-cp-topbar] .cp-topbar__fill');
     if (topFill) topFill.style.width = `${pct}%`;
     renderTocCounts(steps, done);
+    const compact = getValue<boolean>(compactKey, false);
+    content.classList.toggle('cp-compact', compact);
+    progress?.querySelector('[data-cp-action="compact"]')?.setAttribute('aria-pressed', String(compact));
     const hidden = getValue<boolean>(hideKey, false);
     content.classList.toggle('cp-hide-done', hidden);
     hideBtn?.setAttribute('aria-pressed', String(hidden));
@@ -128,6 +133,8 @@ function initSteps(content: HTMLElement) {
       next.box.focus({ preventScroll: true });
       next.el.classList.add('cp-flash');
       setTimeout(() => next.el.classList.remove('cp-flash'), 1600);
+    } else if (action === 'compact') {
+      setValue(compactKey, !getValue<boolean>(compactKey, false));
     } else if (action === 'hide') {
       setValue(hideKey, !getValue<boolean>(hideKey, false));
     } else if (action === 'print') {
@@ -149,6 +156,37 @@ function initSteps(content: HTMLElement) {
   onProgressChange(render);
 }
 
+/**
+ * Marks the beginner explanations so "Compact view" can hide them: the intro
+ * before the first section, "What:" / "Why it matters:" / "Clicking:" paragraphs
+ * (and the lists that follow them), and tip / note boxes. Commands ("Typing:"),
+ * "Check it worked:", warnings and script tags always stay.
+ */
+function markExplanations(content: HTMLElement) {
+  const EXPLAIN = /^(what|why|clicking)\b[^:]*:?$/i; // "What:", "Why it matters:", "Clicking (GNOME):"
+  let beforeFirstSection = true;
+  for (const el of [...content.children] as HTMLElement[]) {
+    if (el.matches('.sl-heading-wrapper.level-h2, h2')) beforeFirstSection = false;
+    if (beforeFirstSection) el.classList.add('cp-explain');
+  }
+  for (const block of content.querySelectorAll<HTMLElement>('.cp-block')) {
+    let hiding = false;
+    for (const el of [...block.children] as HTMLElement[]) {
+      if (el.matches('.sl-heading-wrapper, .cp-step, .cp-script')) continue;
+      if (el.matches('.starlight-aside--caution, .starlight-aside--danger')) continue;
+      if (el.matches('.starlight-aside--tip, .starlight-aside--note')) {
+        el.classList.add('cp-explain');
+        continue;
+      }
+      const label = el.tagName === 'P' && el.firstElementChild?.tagName === 'STRONG' && el.firstChild === el.firstElementChild
+        ? (el.firstElementChild.textContent ?? '').trim()
+        : null;
+      if (label !== null) hiding = EXPLAIN.test(label);
+      if (hiding) el.classList.add('cp-explain');
+    }
+  }
+}
+
 /** Wraps a "mark done" marker, its heading and the content after it in a section. */
 function wrapStepBlock(marker: HTMLElement): HTMLElement {
   const isHeading = (el: Element | null) =>
@@ -163,7 +201,7 @@ function wrapStepBlock(marker: HTMLElement): HTMLElement {
   while (el) {
     const next: Element | null = el.nextElementSibling;
     block.append(el);
-    if (!next || (next !== marker && isHeading(next)) || next.matches('.cp-step')) break;
+    if (!next || (next !== marker && (isHeading(next) || next.matches('.cp-step')))) break;
     el = next;
   }
   return block;

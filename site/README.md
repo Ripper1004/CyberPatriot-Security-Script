@@ -79,7 +79,8 @@ site/
     ├── components/
     │   ├── ChecklistHeader.astro
     │   └── overrides/      # Starlight components we customise (title, content, hero)
-    ├── pages/              # home, tools, downloads, progress
+    ├── pages/              # home (Learn), toolkit dashboard, tools, downloads, progress
+    ├── routeData.ts        # splits the sidebar into the Toolkit and Learn sections
     ├── scripts/            # browser code: progress storage, interactive checklists
     ├── styles/             # theme colours, components, print
     └── content/docs/about.md

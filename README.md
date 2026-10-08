@@ -54,7 +54,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\Harden.ps1
 
 **https://cp-toolkit.pages.dev/**: [`site/`](site/) turns everything above into a website for people who don't use GitHub. It's built with Astro + Starlight and hosted on Cloudflare Pages.
 
-- **Interactive checklists:** tick off steps, see your progress, jump to the next step, print, and reset for a new image.
+- **Two sections:** **Toolkit** (dashboard, checklists, tools, scripts, reference: no introductions) for people who know the game, and **Learn** (welcome, 7 lessons, glossary) for beginners. Switch with the tabs at the top.
+- **Interactive checklists:** tick off steps, see your progress, jump to the next step, print, reset for a new image, and **Compact view** to hide the beginner explanations.
 - **A 7-lesson learning path** for beginners.
 - **Tools:**
   - README config builder: paste the README and get the script's config file

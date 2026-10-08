@@ -1,0 +1,370 @@
+---
+// Toolkit dashboard: everything an experienced student needs during a round,
+// with no introductions.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { CHECKLISTS, IMAGE_NAMES, checklistSteps, roundsFor, SCRIPTS } from '../data/site';
+
+const lists = CHECKLISTS.map((c) => {
+  const steps = checklistSteps[`checklists/${c.id}`].steps;
+  return {
+    ...c,
+    page: `checklists/${c.id}`,
+    total: steps.length,
+    auto: steps.filter((s) => s.script === 'auto').length,
+    rounds: roundsFor(c.image)
+      .map((r) => r.name.replace(' Round', '').replace('Round ', 'R').replace('Semifinals', 'Semis'))
+      .join(' · '),
+  };
+});
+
+const flow = [
+  { n: 1, title: 'README', text: 'Admins, users, critical services.', href: '/tools/config-builder/', link: 'Config builder' },
+  { n: 2, title: 'Snapshot + forensics', text: 'Answer before changing anything.', href: '/guides/forensics-questions/', link: 'Forensics' },
+  { n: 3, title: 'Script', text: 'Audit, read REVIEW, Apply.', href: '/downloads/', link: 'Scripts' },
+  { n: 4, title: 'Checklist', text: 'Tick ✅ steps, do 🔎 and ✋.', href: '#lists', link: 'Pick OS' },
+  { n: 5, title: 'Final checks', text: 'Critical services up, no penalties.', href: '/tools/round-timer/', link: 'Timer' },
+];
+
+const runCmds = [
+  { os: 'Linux', cmd: 'sudo bash harden.sh --audit --config my.conf' },
+  { os: 'Windows', cmd: 'powershell -ExecutionPolicy Bypass -File .\\Harden.ps1 -Mode Audit -Config .\\my-readme.psd1' },
+  { os: 'FreeBSD', cmd: 'sh harden.sh --audit --config my.conf' },
+];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Toolkit',
+    description: 'Checklists, tools and scripts for people who already know how a round works.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="tk cp-wide not-content">
+    <p class="tk__lead">
+      Everything for a round, no introductions. New to this? <a href="/">Start with the Learn section</a>.
+    </p>
+
+    <a class="tk__continue" href="/" data-tk-continue hidden>
+      <span>Continue:</span> <strong data-tk-continue-title></strong> <span data-tk-continue-meta></span> →
+    </a>
+
+    <ol class="tk__flow" aria-label="Round order">
+      {
+        flow.map((f) => (
+          <li>
+            <span class="tk__n">{f.n}</span>
+            <div>
+              <p class="tk__flow-title">{f.title}</p>
+              <p class="tk__flow-text">
+                {f.text} <a href={f.href}>{f.link} →</a>
+              </p>
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+
+    <section id="lists" aria-labelledby="tk-lists">
+      <h2 id="tk-lists" class="tk__h">Checklists</h2>
+      <div class="tk__lists">
+        {
+          lists.map((c) => (
+            <a class="tk__list" href={`/checklists/${c.id}/`} data-tk-page={c.page} data-total={c.total}>
+              <span class={`tk__dot tk__dot--${c.image}`} aria-hidden="true" />
+              <span class="tk__list-name">{c.name}</span>
+              <span class="tk__list-meta">
+                {c.rounds || 'Legacy'} · {IMAGE_NAMES[c.image]}
+              </span>
+              <span class="tk__list-auto" title="Steps the script does fully">
+                ✅ {c.auto}
+              </span>
+              <span class="cp-bar tk__bar">
+                <span class="cp-bar__fill" style="width:0%" />
+              </span>
+              <span class="tk__count" data-tk-count>
+                0/{c.total}
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <div class="tk__cols">
+      <section aria-labelledby="tk-tools">
+        <h2 id="tk-tools" class="tk__h">Tools</h2>
+        <ul class="tk__links">
+          <li><a href="/tools/config-builder/">README config builder</a><span>paste README → config + commands</span></li>
+          <li><a href="/tools/round-timer/">Round timer</a><span>phases, full screen</span></li>
+          <li><a href="/tools/commands/">Command finder</a><span>Linux / Windows / FreeBSD</span></li>
+          <li><a href="/downloads/">Download the scripts</a><span>wget / Invoke-WebRequest / fetch</span></li>
+          <li><a href="/progress/">My progress</a><span>export, import, reset</span></li>
+        </ul>
+      </section>
+      <section aria-labelledby="tk-ref">
+        <h2 id="tk-ref" class="tk__h">Reference</h2>
+        <ul class="tk__links">
+          <li><a href="/guides/forensics-questions/">Forensics questions</a><span>hashes, decoding, finding files, logs</span></li>
+          <li><a href="/guides/linux-service-hardening/">Linux service hardening</a><span>Apache, MySQL, FTP, Samba…</span></li>
+          <li><a href="/guides/things-that-lose-points/">Things that lose points</a><span>penalties to avoid</span></li>
+          <li><a href="/start-here/using-the-scripts/">Using the scripts</a><span>results, backups, undo</span></li>
+        </ul>
+      </section>
+    </div>
+
+    <section aria-labelledby="tk-run">
+      <h2 id="tk-run" class="tk__h">Run the script (audit first)</h2>
+      <div class="tk__cmds">
+        {
+          runCmds.map((r) => (
+            <div class="tk__cmd">
+              <span>{r.os}</span>
+              <code>{r.cmd}</code>
+              <button type="button" class="cp-btn cp-btn--sm" data-copy={r.cmd}>
+                Copy
+              </button>
+            </div>
+          ))
+        }
+      </div>
+      <p class="cp-hint">
+        Swap <code>--audit</code> / <code>Audit</code> for <code>--apply</code> / <code>Apply</code> after reading the REVIEW
+        lines. Works on: {SCRIPTS.map((s) => s.worksOn).join(' · ')}.
+      </p>
+    </section>
+  </div>
+</StarlightPage>
+
+<script>
+  import { getDoneSteps, getLast, onProgressChange } from '../scripts/store';
+
+  function render() {
+    document.querySelectorAll<HTMLElement>('[data-tk-page]').forEach((row) => {
+      const total = Number(row.dataset.total);
+      const done = getDoneSteps(row.dataset.tkPage as string).size;
+      const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+      row.querySelector<HTMLElement>('.cp-bar__fill')!.style.width = `${pct}%`;
+      row.querySelector('.cp-bar')!.classList.toggle('is-complete', pct === 100);
+      row.querySelector('[data-tk-count]')!.textContent = `${done}/${total}`;
+    });
+    const last = getLast();
+    const banner = document.querySelector<HTMLAnchorElement>('[data-tk-continue]')!;
+    const row = last && document.querySelector<HTMLElement>(`[data-tk-page="${last.page}"]`);
+    if (row) {
+      const total = Number(row.dataset.total);
+      const done = getDoneSteps(last.page).size;
+      banner.hidden = !(done > 0 && done < total);
+      banner.href = row.getAttribute('href') ?? '/';
+      banner.querySelector('[data-tk-continue-title]')!.textContent = row.querySelector('.tk__list-name')?.textContent ?? '';
+      banner.querySelector('[data-tk-continue-meta]')!.textContent = `${done}/${total} steps`;
+    }
+  }
+  document.addEventListener('click', async (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-copy]');
+    if (!b) return;
+    try {
+      await navigator.clipboard.writeText(b.dataset.copy as string);
+      b.textContent = 'Copied ✓';
+      setTimeout(() => (b.textContent = 'Copy'), 1500);
+    } catch {
+      window.prompt('Copy this:', b.dataset.copy);
+    }
+  });
+  render();
+  onProgressChange(render);
+</script>
+
+<style>
+  .tk {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+  .tk__lead {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+  }
+  .tk__continue {
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--sl-color-accent);
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+  .tk__h {
+    margin: 0 0 0.6rem;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-lg);
+    font-weight: 750;
+  }
+  .tk__flow {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  }
+  .tk__flow li {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--cp-card);
+  }
+  .tk__flow p {
+    margin: 0;
+  }
+  .tk__n {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+    font-size: var(--sl-text-xs);
+    font-weight: 800;
+  }
+  .tk__flow-title {
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-sm);
+    font-weight: 700;
+  }
+  .tk__flow-text {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .tk__lists {
+    display: grid;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+    overflow: hidden;
+  }
+  .tk__list {
+    display: grid;
+    grid-template-columns: auto minmax(7rem, 1fr) auto auto minmax(4rem, 8rem) 3.5rem;
+    gap: 0.4rem 0.9rem;
+    align-items: center;
+    padding: 0.7rem 1rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+    text-decoration: none;
+  }
+  .tk__list + .tk__list {
+    border-top: 1px solid var(--cp-border);
+  }
+  .tk__list:hover {
+    background: var(--cp-card-hover);
+  }
+  .tk__list-name {
+    color: var(--sl-color-white);
+    font-weight: 700;
+  }
+  .tk__list-meta,
+  .tk__list-auto {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    white-space: nowrap;
+  }
+  .tk__count {
+    font-size: var(--sl-text-xs);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+  @media (max-width: 40rem) {
+    .tk__list {
+      grid-template-columns: auto 1fr auto;
+    }
+    .tk__list-meta,
+    .tk__list-auto {
+      display: none;
+    }
+    .tk__bar {
+      grid-column: 2 / 3;
+    }
+  }
+  .tk__dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    background: var(--sl-color-accent);
+  }
+  .tk__dot--windows { background: var(--cp-os-windows); }
+  .tk__dot--server { background: var(--cp-os-server); }
+  .tk__dot--mint { background: var(--cp-os-mint); }
+  .tk__dot--debian { background: var(--cp-os-debian); }
+  .tk__dot--freebsd { background: var(--cp-os-freebsd); }
+  .tk__dot--ubuntu { background: var(--cp-os-ubuntu); }
+  .tk__cols {
+    display: grid;
+    gap: 1.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  }
+  .tk__links {
+    display: grid;
+    gap: 0.1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tk__links li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.6rem;
+    align-items: baseline;
+    padding: 0.4rem 0;
+    border-bottom: 1px dashed var(--cp-border);
+  }
+  .tk__links a {
+    color: var(--sl-color-white);
+    font-weight: 650;
+    text-decoration: none;
+  }
+  .tk__links a:hover {
+    text-decoration: underline;
+  }
+  .tk__links span {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .tk > *,
+  .tk__cols > * {
+    min-width: 0;
+  }
+  .tk__cmds {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+  }
+  .tk__cmd {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.4rem 0.4rem 0.4rem 0.75rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-black);
+  }
+  .tk__cmd span {
+    flex: none;
+    width: 4.5rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+  }
+  .tk__cmd code {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-xs);
+    white-space: nowrap;
+  }
+</style>

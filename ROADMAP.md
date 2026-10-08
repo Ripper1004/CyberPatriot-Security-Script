@@ -231,6 +231,11 @@ So the checklists still read well on GitHub, and editing `docs/` updates the web
   - "Reset for a new image"
   - Print with tick boxes
 - **Script tags:** every checklist step says what the hardening script does for it (✅ done, 🔎 checks but you decide, ✋ by hand). Each checklist has a "Fast path: run the hardening script" step right after forensics. After an Apply run, **Tick the script's ✅ steps** ticks them all, so "Hide finished steps" and "Go to next step" skip straight to what's left.
+- **Two sections**, switched with tabs in the header (and at the top of the mobile menu):
+  - **Toolkit**, for experienced students: a no-introduction dashboard (`/toolkit/`), the checklists, tools, script downloads and reference guides.
+  - **Learn**, for beginners: the welcome page, the lessons, the glossary and quiz, and the mentor guide.
+  - Each section has its own sidebar and previous/next links (`site/src/routeData.ts`).
+- **Compact view** on checklists hides "What", "Why it matters" and "Clicking" paragraphs and tip boxes, but keeps the commands, warnings and script tags.
 - **Learning path:** 7 lessons in order, with "Mark as read" and "Next lesson".
 - **Home page:**
   - "continue where you left off"
