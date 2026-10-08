@@ -30,21 +30,17 @@ All three work the same way:
 | `REVIEW` | **A human needs to look at this.** It's in the findings report. |
 | `FAILED` | It tried and failed. The log file says why. Fix it by hand using the checklist. |
 
+> [!TIP]
+> **No internet on the image?** Download the files on another computer (same page) and copy them over with a USB drive or a shared folder into `~/cp` (Linux, FreeBSD) or `C:\cp` (Windows). You can also download the whole project as a ZIP from the GitHub page (**Code → Download ZIP**) and find the scripts in its `scripts` folder.
+
 ---
 
 ## Linux (Mint / Debian / Ubuntu)
 
-### 1. Get the toolkit onto the image
-**Option A, with git** (if it's installed):
+### 1. Get the script onto the image
+Open [Download the scripts](/downloads/) on this website (on the image, in Firefox) and copy the **Linux** download commands into a terminal. They save `harden.sh` and an example config in the `cp` folder inside your home folder. Then:
 ```bash
-git clone https://github.com/Ripper1004/CyberPatriot-Security-Script.git
-cd CyberPatriot-Security-Script/scripts/linux
-```
-**Option B, download the ZIP:** in Firefox go to the GitHub page, click **Code → Download ZIP**, then:
-```bash
-cd ~/Downloads
-unzip CyberPatriot-Security-Script-main.zip
-cd CyberPatriot-Security-Script-main/scripts/linux
+cd ~/cp
 ```
 
 ### 2. Run it
@@ -88,16 +84,15 @@ sudo cp -a /root/cyberpatriot/backups/20261022-140501/etc/ssh/sshd_config /etc/s
 
 ## Windows
 
-### 1. Get the toolkit onto the image
-1. In Edge, go to the GitHub page and click **Code → Download ZIP**.
-2. Open **Downloads**, right-click the ZIP and choose **Extract All**.
+### 1. Get the script onto the image
+Open [Download the scripts](/downloads/) on this website (on the image, in Edge) and copy the **Windows** download commands into PowerShell. They save `Harden.ps1` and an example config in `C:\cp`.
 
 ### 2. Open PowerShell as Administrator
 Click **Start**, type `powershell`, then choose **Run as administrator**.
 
 ### 3. Run it
 ```powershell
-cd $HOME\Downloads\CyberPatriot-Security-Script-main\CyberPatriot-Security-Script-main\scripts\windows
+cd C:\cp
 powershell -ExecutionPolicy Bypass -File .\Harden.ps1
 ```
 `-ExecutionPolicy Bypass` lets this one script run without changing the computer's script policy.
@@ -122,10 +117,11 @@ Everything is in `C:\harden-toolkit\`:
 
 ## FreeBSD
 
+Open [Download the scripts](/downloads/) on this website and run the **FreeBSD** command there as root. It saves `harden.sh` in `~/cp`. Then:
+
 ```sh
 su -
-fetch https://github.com/Ripper1004/CyberPatriot-Security-Script/archive/refs/heads/main.zip
-unzip main.zip && cd CyberPatriot-Security-Script-main/scripts/freebsd
+cd ~/cp
 sh harden.sh
 ```
 

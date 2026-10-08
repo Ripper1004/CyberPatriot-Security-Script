@@ -43,12 +43,12 @@ FreeBSD may appear in the **Semifinals** (depending on tier). It's a Unix like L
 
 **Why it matters:** The script does in a few minutes what takes an hour by hand, and its findings report is a ready-made to-do list.
 
-**Typing:** become root, get the script onto the image ([how to download it](../start-here/using-the-scripts.md)), then:
+**Typing:** become root, get the script onto the image (open [Download the scripts](/downloads/) on this website and run the **FreeBSD** command there; it saves `harden.sh` in `~/cp`), then:
 ```sh
 su -                                    # asks for the ROOT password
-cd CyberPatriot-Security-Script-main/scripts/freebsd
+cd ~/cp
 sh harden.sh --audit                    # report only, changes NOTHING; read every REVIEW line
-sh harden.sh --audit --config my.conf   # optional: README info from a file (make it with the README config builder on the website)
+sh harden.sh --audit --config my.conf   # optional: README info from a file (make it with the README config builder on the website and save it in `~/cp`)
 sh harden.sh --apply                    # now fix things (add --config my.conf if you made one)
 cat /root/cyberpatriot/findings-*.txt   # the findings report: your to-do list
 ```

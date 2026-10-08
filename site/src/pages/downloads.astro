@@ -27,7 +27,7 @@ function getCommands(id: string) {
   if (id === 'freebsd') {
     return {
       label: 'Terminal (as root: su -)',
-      lines: files.map((f) => `fetch ORIGIN${f.url}`),
+      lines: ['mkdir -p ~/cp && cd ~/cp', ...files.map((f) => `fetch ORIGIN${f.url}`)],
       verify: `sha256 ${files[0].name}`,
     };
   }

@@ -247,6 +247,15 @@ a.cp-card:hover {
 .cp-cl-meta__link:hover code {
   border-color: var(--sl-color-accent);
 }
+.cp-cl-meta__tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.9rem;
+}
+.cp-cl-meta__tools a {
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+}
 .cp-cl-meta code {
   padding: 0.1rem 0.4rem;
   border: 1px solid var(--cp-border);
@@ -619,6 +628,39 @@ a.cp-card:hover {
     animation-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Callouts (Note / Tip / Warning): the same card look as our own components,
+   with a coloured bar, instead of Starlight's saturated blue and purple blocks */
+.starlight-aside {
+  --aside: var(--sl-color-accent);
+  --sl-color-asides-text-accent: var(--aside);
+  --sl-color-asides-border: var(--aside);
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--cp-border);
+  border-inline-start: 4px solid var(--aside);
+  border-radius: var(--cp-radius-sm);
+  background: color-mix(in srgb, var(--aside) 7%, var(--cp-card));
+  color: var(--sl-color-gray-1);
+}
+.starlight-aside--tip {
+  --aside: var(--cp-success);
+}
+.starlight-aside--caution {
+  --aside: var(--cp-warn);
+}
+.starlight-aside--danger {
+  --aside: var(--cp-danger);
+}
+.starlight-aside__title {
+  font-family: var(--cp-font-display);
+  font-size: var(--sl-text-base);
+}
+.starlight-aside__content > :first-child {
+  margin-top: 0;
+}
+.starlight-aside__content > :last-child {
+  margin-bottom: 0;
 }
 
 /* Sidebar: the current page gets a tint and an accent bar, not a solid fill */

@@ -27,13 +27,15 @@ export const onRequest = defineRouteMiddleware((context) => {
   const shown = kept.map((e) => (e.type === 'group' ? { ...e, label: e.label.replace(/^Learn: /, ''), collapsed: false } : e));
   route.sidebar = shown as unknown as typeof route.sidebar;
 
-  // Previous / next links stay inside the section.
-  const links = flatten(shown) as unknown as (typeof route.pagination.prev)[];
+  // Previous / next cards only make sense on the beginner path (Welcome and
+  // the lessons, in order). The Toolkit is a toolbox, not a sequence, and
+  // "Next: Round log" after "Findings to-do list" means nothing.
+  const group = learn ? shown.find(hasCurrent) : undefined;
+  const path = group && group.type === 'group' && group.label === 'Start here' ? group : undefined;
+  const links = path ? (flatten([path]) as unknown as (typeof route.pagination.prev)[]) : [];
   const i = links.findIndex((l) => l?.isCurrent);
-  if (i >= 0) {
-    route.pagination = {
-      prev: route.pagination.prev && i > 0 ? links[i - 1] : undefined,
-      next: route.pagination.next && i < links.length - 1 ? links[i + 1] : undefined,
-    };
-  }
+  route.pagination = {
+    prev: route.pagination.prev && i > 0 ? links[i - 1] : undefined,
+    next: route.pagination.next && i >= 0 && i < links.length - 1 ? links[i + 1] : undefined,
+  };
 });

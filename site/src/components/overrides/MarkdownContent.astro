@@ -3,6 +3,7 @@
 // adds a "mark as read / next lesson" card to the end of each lesson.
 import Default from '@astrojs/starlight/components/MarkdownContent.astro';
 import { lessons } from '../../data/site';
+import RelatedTools from '../RelatedTools.astro';
 
 const { entry } = Astro.locals.starlightRoute;
 const cp = (entry.data as { cp?: { kind: string; id: string; lesson?: number; steps?: number } }).cp;
@@ -14,6 +15,7 @@ const next = lesson ? lessons[lesson.n] : undefined;
   <div class="cp-content" data-cp-page={entry.id} data-cp-kind={cp?.kind ?? 'page'}>
     <slot />
   </div>
+  <RelatedTools id={entry.id} />
   {
     lesson && (
       <section class="cp-lesson-done not-content" data-cp-lesson={lesson.id} aria-label="Lesson progress" data-pagefind-ignore>

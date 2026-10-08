@@ -68,9 +68,9 @@ More: [Forensics questions guide](../guides/forensics-questions.md).
 
 **Why it matters:** The script does in minutes what takes an hour by hand. But it deletes users and files, and that can destroy the evidence a forensics question asks about.
 
-1. Get the script onto the image: see [Using the scripts](../start-here/using-the-scripts.md).
-2. Optional: make a config file with the README config builder on the website and save it as `my-readme.psd1` next to `Harden.ps1`. Without a config file, the script asks you for the README names instead.
-3. Open PowerShell as Administrator (step 0.3) and `cd` into the folder that holds `Harden.ps1`.
+1. Get the script onto the image: open [Download the scripts](/downloads/) on this website and run the **Windows** download commands in PowerShell. They save `Harden.ps1` and an example config in `C:\cp`. No internet on the image? See [Using the scripts](../start-here/using-the-scripts.md).
+2. Optional: make a config file with the [README config builder](/tools/config-builder/) and save it as `my-readme.psd1` in `C:\cp`, next to `Harden.ps1`. Without a config file, the script asks you for the README names instead.
+3. Open PowerShell as Administrator (step 0.3) and go to the folder: `cd C:\cp`.
 4. Run it in **Audit** mode first. Audit changes nothing. Read every `REVIEW` line.
 5. Run it in **Apply** mode. Answer its questions using the README.
 

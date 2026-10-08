@@ -1,4 +1,4 @@
-# Things that lose points (read this first!)
+# Things that lose points
 
 The scoring engine gives **penalties** (negative points) when you make things worse. These are the mistakes teams make most. Each one is easy to avoid if you know about it.
 

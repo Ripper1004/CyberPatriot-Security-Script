@@ -1,4 +1,4 @@
-# Reading the README (always first!)
+# Reading the README
 
 The README on the desktop is the most important thing on the image. **Every decision you make depends on it.** If the README says Bob is an administrator, then removing Bob's admin rights *loses* points, even though "fewer admins" is normally safer.
 

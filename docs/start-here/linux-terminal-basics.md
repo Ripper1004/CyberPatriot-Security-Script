@@ -1,4 +1,4 @@
-# Linux terminal basics (for people who have never typed a command)
+# Linux terminal basics
 
 The **terminal** is a window where you type commands instead of clicking. On Linux most security work is faster in the terminal, and many settings can *only* be changed there.
 
