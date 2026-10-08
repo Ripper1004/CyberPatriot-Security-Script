@@ -20,7 +20,7 @@ const lists = CHECKLISTS.map((c) => {
 const flow = [
   { n: 1, title: 'README', text: 'Admins, users, critical services.', href: '/tools/config-builder/', link: 'Config builder' },
   { n: 2, title: 'Snapshot + forensics', text: 'Answer before changing anything.', href: '/guides/forensics-questions/', link: 'Forensics' },
-  { n: 3, title: 'Script', text: 'Audit, read REVIEW, Apply.', href: '/downloads/', link: 'Scripts' },
+  { n: 3, title: 'Script', text: 'Audit, Apply, paste the report.', href: '/tools/findings/', link: 'Findings' },
   { n: 4, title: 'Checklist', text: 'Tick ✅ steps, do 🔎 and ✋.', href: '#lists', link: 'Pick OS' },
   { n: 5, title: 'Final checks', text: 'Critical services up, no penalties.', href: '/tools/round-timer/', link: 'Timer' },
 ];
@@ -97,6 +97,9 @@ const runCmds = [
         <ul class="tk__links">
           <li><a href="/tools/config-builder/">README config builder</a><span>paste README → config + commands</span></li>
           <li><a href="/tools/round-timer/">Round timer</a><span>phases, full screen</span></li>
+          <li><a href="/tools/findings/">Findings to-do list</a><span>paste the script's report</span></li>
+          <li><a href="/tools/round-log/">Round log</a><span>changes + score, find penalties</span></li>
+          <li><a href="/tools/forensics/">Forensics helper</a><span>hashes, Base64, hex, ROT13</span></li>
           <li><a href="/tools/commands/">Command finder</a><span>Linux / Windows / FreeBSD</span></li>
           <li><a href="/downloads/">Download the scripts</a><span>wget / Invoke-WebRequest / fetch</span></li>
           <li><a href="/progress/">My progress</a><span>export, import, reset</span></li>
@@ -107,6 +110,7 @@ const runCmds = [
         <ul class="tk__links">
           <li><a href="/guides/forensics-questions/">Forensics questions</a><span>hashes, decoding, finding files, logs</span></li>
           <li><a href="/guides/linux-service-hardening/">Linux service hardening</a><span>Apache, MySQL, FTP, Samba…</span></li>
+          <li><a href="/guides/cisco-networking/">Cisco & Packet Tracer</a><span>IOS commands, subnetting, ports</span></li>
           <li><a href="/guides/things-that-lose-points/">Things that lose points</a><span>penalties to avoid</span></li>
           <li><a href="/start-here/using-the-scripts/">Using the scripts</a><span>results, backups, undo</span></li>
         </ul>

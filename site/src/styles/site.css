@@ -710,3 +710,73 @@ fieldset > legend + * {
 .sl-markdown-content .cp-compact .cp-block {
   margin-top: 1.1rem;
 }
+
+/* "Use your names in commands" */
+.cp-names {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--cp-border);
+}
+.cp-names__details summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+.cp-names__state {
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--sl-color-gray-6);
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+}
+.cp-names__hint {
+  margin: 0.6rem 0;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-xs);
+}
+.cp-names__grid {
+  display: grid;
+  gap: 0.45rem;
+}
+.cp-names__row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) minmax(7rem, 11rem);
+  gap: 0.6rem;
+  align-items: center;
+  font-size: var(--sl-text-sm);
+}
+.cp-names__role {
+  color: var(--sl-color-gray-2);
+  font-size: var(--sl-text-xs);
+}
+.cp-names__row .cp-input {
+  padding: 0.35rem 0.6rem;
+  font-family: var(--sl-font-mono);
+}
+.cp-names__row .cp-input.is-invalid {
+  border-color: var(--cp-danger);
+}
+@media (max-width: 34rem) {
+  .cp-names__row {
+    grid-template-columns: 4.5rem 1fr;
+  }
+  .cp-names__row .cp-input {
+    grid-column: 1 / -1;
+  }
+}
+.cp-names__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+.cp-name.is-set {
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--sl-color-accent) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
+}

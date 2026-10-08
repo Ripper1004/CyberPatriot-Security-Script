@@ -1,0 +1,460 @@
+---
+// Networking quiz (Cisco part of a round) + endless subnetting practice.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { NET_QUESTIONS } from '../../data/networking-quiz';
+
+const topics = [...new Set(NET_QUESTIONS.map((q) => q.topic))];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Networking quiz',
+    description: 'Practice for the Cisco networking part of a round: multiple-choice questions and endless subnetting practice.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="nq not-content" data-nq data-questions={JSON.stringify(NET_QUESTIONS)}>
+    <p class="nq__intro">
+      Practice for the Cisco networking part of a round. Study first with the <a href="/guides/cisco-networking/"
+        >Cisco &amp; Packet Tracer guide</a
+      >.
+    </p>
+
+    <div class="cp-segmented" role="group" aria-label="Mode" data-nq-modes>
+      <button type="button" data-mode="quiz" aria-pressed="true">Quiz</button>
+      <button type="button" data-mode="subnet" aria-pressed="false">Subnetting practice</button>
+    </div>
+
+    <!-- Quiz -->
+    <section data-nq-panel="quiz">
+      <div class="nq__topics" role="group" aria-label="Topics" data-nq-topics>
+        <button type="button" class="nq__topic" data-topic="all" aria-pressed="true">All topics</button>
+        {
+          topics.map((t) => (
+            <button type="button" class="nq__topic" data-topic={t} aria-pressed="false">
+              {t}
+            </button>
+          ))
+        }
+      </div>
+      <div class="nq__card" data-nq-quiz>
+        <div class="nq__progress"><span data-nq-n></span><span data-nq-score></span></div>
+        <p class="nq__topic-label" data-nq-topic></p>
+        <p class="nq__q" data-nq-q></p>
+        <div class="nq__opts" data-nq-opts></div>
+        <p class="nq__why" data-nq-why></p>
+        <button type="button" class="cp-btn cp-btn--primary" data-nq-next hidden>Next →</button>
+      </div>
+      <div class="nq__card" data-nq-done hidden>
+        <p class="nq__big" data-nq-final></p>
+        <p class="nq__msg" data-nq-msg></p>
+        <button type="button" class="cp-btn cp-btn--primary" data-nq-restart>Another 10 questions</button>
+      </div>
+    </section>
+
+    <!-- Subnetting -->
+    <section data-nq-panel="subnet" hidden>
+      <div class="nq__card">
+        <p class="nq__topic-label">Find the answers for</p>
+        <p class="nq__ip" data-sn-ip></p>
+        <form class="nq__sn" data-sn-form autocomplete="off">
+          <label><span>Subnet mask</span><input class="cp-input" data-sn="mask" placeholder="x.x.x.x" /></label>
+          <label><span>Network address</span><input class="cp-input" data-sn="network" placeholder="x.x.x.x" /></label>
+          <label><span>Broadcast address</span><input class="cp-input" data-sn="broadcast" placeholder="x.x.x.x" /></label>
+          <label><span>First usable host</span><input class="cp-input" data-sn="first" placeholder="x.x.x.x" /></label>
+          <label><span>Last usable host</span><input class="cp-input" data-sn="last" placeholder="x.x.x.x" /></label>
+          <label><span>Usable hosts</span><input class="cp-input" data-sn="hosts" inputmode="numeric" placeholder="number" /></label>
+          <div class="nq__sn-btns">
+            <button type="submit" class="cp-btn cp-btn--primary">Check</button>
+            <button type="button" class="cp-btn" data-sn-show>Show answers</button>
+            <button type="button" class="cp-btn cp-btn--ghost" data-sn-new>New problem</button>
+          </div>
+        </form>
+        <p class="nq__why" data-sn-result></p>
+        <details class="nq__how">
+          <summary>How to work it out</summary>
+          <ol>
+            <li>Block size = 256 minus the mask number in the "interesting" octet (the one that isn't 255 or 0).</li>
+            <li>Network address = the biggest multiple of the block size that is ≤ the IP's value in that octet.</li>
+            <li>Broadcast = next network address minus 1.</li>
+            <li>First host = network + 1. Last host = broadcast − 1.</li>
+            <li>Usable hosts = 2<sup>(32 − prefix)</sup> − 2.</li>
+          </ol>
+        </details>
+      </div>
+      <p class="nq__streak" data-sn-streak></p>
+    </section>
+  </div>
+</StarlightPage>
+
+<script>
+  import { getValue, setValue } from '../../scripts/store';
+
+  interface Q {
+    topic: string;
+    q: string;
+    options: string[];
+    answer: number;
+    why: string;
+  }
+  const root = document.querySelector<HTMLElement>('[data-nq]')!;
+  const ALL: Q[] = JSON.parse(root.dataset.questions as string);
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+  const shuffle = <T,>(a: T[]) => {
+    const b = [...a];
+    for (let i = b.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [b[i], b[j]] = [b[j], b[i]];
+    }
+    return b;
+  };
+
+  // ---------------- modes
+  $('[data-nq-modes]').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-mode]');
+    if (!b) return;
+    root.querySelectorAll('[data-nq-modes] button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    root.querySelectorAll<HTMLElement>('[data-nq-panel]').forEach((p) => (p.hidden = p.dataset.nqPanel !== b.dataset.mode));
+  });
+
+  // ---------------- quiz
+  let topic = 'all';
+  let round: Q[] = [];
+  let qi = 0;
+  let score = 0;
+  let order: number[] = [];
+
+  function start() {
+    const pool = ALL.filter((q) => topic === 'all' || q.topic === topic);
+    round = shuffle(pool).slice(0, Math.min(10, pool.length));
+    qi = 0;
+    score = 0;
+    $('[data-nq-quiz]').hidden = false;
+    $('[data-nq-done]').hidden = true;
+    show();
+  }
+  function show() {
+    const q = round[qi];
+    order = shuffle(q.options.map((_, i) => i));
+    $('[data-nq-n]').textContent = `Question ${qi + 1} of ${round.length}`;
+    $('[data-nq-score]').textContent = `Score: ${score}`;
+    $('[data-nq-topic]').textContent = q.topic;
+    $('[data-nq-q]').textContent = q.q;
+    $('[data-nq-why]').textContent = '';
+    $('[data-nq-why]').className = 'nq__why';
+    $('[data-nq-next]').hidden = true;
+    $('[data-nq-opts]').innerHTML = order
+      .map((oi, k) => `<button type="button" class="nq__opt" data-oi="${oi}"><kbd>${k + 1}</kbd>${esc(q.options[oi])}</button>`)
+      .join('');
+  }
+  function answer(btn: HTMLButtonElement) {
+    const q = round[qi];
+    const opts = [...root.querySelectorAll<HTMLButtonElement>('.nq__opt')];
+    if (opts.some((o) => o.disabled)) return;
+    const ok = Number(btn.dataset.oi) === q.answer;
+    opts.forEach((o) => {
+      o.disabled = true;
+      if (Number(o.dataset.oi) === q.answer) o.classList.add('is-right');
+    });
+    if (ok) score++;
+    else btn.classList.add('is-wrong');
+    const why = $('[data-nq-why]');
+    why.textContent = `${ok ? 'Correct! ' : 'Not quite. '}${q.why}`;
+    why.className = `nq__why ${ok ? 'is-right' : 'is-wrong'}`;
+    $('[data-nq-score]').textContent = `Score: ${score}`;
+    const next = $<HTMLButtonElement>('[data-nq-next]');
+    next.textContent = qi + 1 < round.length ? 'Next →' : 'See my score →';
+    next.hidden = false;
+    next.focus();
+  }
+  $('[data-nq-opts]').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('.nq__opt');
+    if (b) answer(b);
+  });
+  $('[data-nq-next]').addEventListener('click', () => {
+    qi++;
+    if (qi < round.length) return show();
+    $('[data-nq-quiz]').hidden = true;
+    $('[data-nq-done]').hidden = false;
+    $('[data-nq-final]').textContent = `${score} / ${round.length}`;
+    $('[data-nq-msg]').textContent = score === round.length ? 'Perfect!' : score >= round.length * 0.7 ? 'Nice work.' : 'Keep going: review the guide and try again.';
+    const best = getValue<number>('netquiz-best', 0);
+    if (score > best) setValue('netquiz-best', score);
+  });
+  $('[data-nq-restart]').addEventListener('click', start);
+  $('[data-nq-topics]').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-topic]');
+    if (!b) return;
+    topic = b.dataset.topic as string;
+    root.querySelectorAll('[data-nq-topics] button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    start();
+  });
+  document.addEventListener('keydown', (e) => {
+    if ($('[data-nq-panel="quiz"]').hidden || $('[data-nq-quiz]').hidden) return;
+    if ((e.target as HTMLElement).closest('input, textarea, select') || e.ctrlKey || e.metaKey || e.altKey) return;
+    const n = Number(e.key);
+    const opts = root.querySelectorAll<HTMLButtonElement>('.nq__opt');
+    if (n >= 1 && n <= opts.length) opts[n - 1].click();
+  });
+  start();
+
+  // ---------------- subnetting
+  const toIp = (n: number) => [24, 16, 8, 0].map((s) => (n >>> s) & 255).join('.');
+  const parseIp = (s: string) => {
+    const p = s.trim().split('.');
+    if (p.length !== 4 || p.some((x) => !/^\d{1,3}$/.test(x) || Number(x) > 255)) return null;
+    return p.reduce((a, x) => ((a << 8) | Number(x)) >>> 0, 0);
+  };
+  type Problem = { ip: number; prefix: number; mask: number; network: number; broadcast: number };
+  function newProblem(): Problem {
+    const prefix = 8 + Math.floor(Math.random() * 23); // /8 to /30
+    const privates = [
+      [10, 0, 0, 0],
+      [172, 16 + Math.floor(Math.random() * 16), 0, 0],
+      [192, 168, 0, 0],
+    ][Math.floor(Math.random() * 3)];
+    const base = ((privates[0] << 24) | (privates[1] << 16)) >>> 0;
+    const fixed = privates[0] === 10 ? 8 : 16;
+    const rand = Math.floor(Math.random() * 2 ** (32 - fixed));
+    const ip = (base | rand) >>> 0;
+    const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+    const network = (ip & mask) >>> 0;
+    const broadcast = (network | (~mask >>> 0)) >>> 0;
+    if (ip === network || ip === broadcast) return newProblem();
+    return { ip, prefix, mask, network, broadcast };
+  }
+  let p = newProblem();
+  let streak = getValue<number>('subnet-streak', 0);
+  const answers = () => ({
+    mask: toIp(p.mask),
+    network: toIp(p.network),
+    broadcast: toIp(p.broadcast),
+    first: toIp(p.network + 1),
+    last: toIp(p.broadcast - 1),
+    hosts: String(2 ** (32 - p.prefix) - 2),
+  });
+  function showProblem() {
+    $('[data-sn-ip]').textContent = `${toIp(p.ip)} /${p.prefix}`;
+    root.querySelectorAll<HTMLInputElement>('[data-sn]').forEach((i) => {
+      i.value = '';
+      i.classList.remove('is-ok', 'is-bad');
+    });
+    $('[data-sn-result]').textContent = '';
+    $('[data-sn-streak]').textContent = streak ? `Streak: ${streak} correct in a row` : '';
+  }
+  $<HTMLFormElement>('[data-sn-form]').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const a = answers();
+    let right = 0;
+    root.querySelectorAll<HTMLInputElement>('[data-sn]').forEach((i) => {
+      const key = i.dataset.sn as keyof typeof a;
+      const given = key === 'hosts' ? i.value.replace(/[,\s]/g, '') : parseIp(i.value) === null ? i.value.trim() : toIp(parseIp(i.value)!);
+      const ok = given === a[key];
+      i.classList.toggle('is-ok', ok);
+      i.classList.toggle('is-bad', !ok);
+      if (ok) right++;
+    });
+    const all = right === 6;
+    streak = all ? streak + 1 : 0;
+    setValue('subnet-streak', streak);
+    $('[data-sn-result]').textContent = all ? 'All correct! Press "New problem" for another.' : `${right} of 6 correct. Fix the red boxes or press "Show answers".`;
+    $('[data-sn-result]').className = `nq__why ${all ? 'is-right' : 'is-wrong'}`;
+    $('[data-sn-streak]').textContent = streak ? `Streak: ${streak} correct in a row` : '';
+  });
+  $('[data-sn-show]').addEventListener('click', () => {
+    const a = answers();
+    root.querySelectorAll<HTMLInputElement>('[data-sn]').forEach((i) => {
+      i.value = a[i.dataset.sn as keyof typeof a];
+      i.classList.remove('is-bad');
+    });
+    streak = 0;
+    setValue('subnet-streak', 0);
+    $('[data-sn-result]').textContent = `Block size in the interesting octet: ${2 ** ((32 - p.prefix) % 8 || 8)}.`;
+  });
+  $('[data-sn-new]').addEventListener('click', () => {
+    p = newProblem();
+    showProblem();
+  });
+  showProblem();
+</script>
+
+<style>
+  .nq {
+    display: grid;
+    gap: 1.1rem;
+    max-width: 48rem;
+  }
+  .nq__intro {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+  }
+  .nq > .cp-segmented {
+    justify-self: start;
+  }
+  .nq__topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+  }
+  .nq__topic {
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font: inherit;
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .nq__topic[aria-pressed='true'] {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+  }
+  .nq__card {
+    padding: 1.4rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 1.1rem;
+    background: var(--cp-card);
+    box-shadow: var(--cp-shadow);
+  }
+  .nq__progress {
+    display: flex;
+    justify-content: space-between;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+  .nq__topic-label {
+    margin: 1rem 0 0.3rem;
+    color: var(--sl-color-accent);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .nq__q {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: clamp(1.1rem, 2.4vw, 1.35rem);
+    font-weight: 650;
+    line-height: 1.45;
+  }
+  .nq__opts {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 1.1rem;
+  }
+  .nq :global(.nq__opt) {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-black);
+    color: var(--sl-color-white);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+  .nq :global(.nq__opt:hover:not(:disabled)) {
+    border-color: var(--sl-color-accent);
+  }
+  .nq :global(.nq__opt kbd) {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 1px solid var(--cp-border);
+    border-radius: 0.35rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .nq :global(.nq__opt:disabled) {
+    cursor: default;
+    opacity: 0.6;
+  }
+  .nq :global(.nq__opt.is-right) {
+    border-color: var(--cp-success);
+    background: var(--cp-success-low);
+    opacity: 1;
+  }
+  .nq :global(.nq__opt.is-wrong) {
+    border-color: var(--cp-danger);
+    background: var(--cp-danger-low);
+    opacity: 1;
+  }
+  .nq__why {
+    min-height: 1.4rem;
+    margin: 1rem 0;
+    color: var(--sl-color-gray-1);
+    font-size: var(--sl-text-sm);
+  }
+  .nq__why.is-right {
+    color: var(--cp-success);
+  }
+  .nq__big {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: 3rem;
+    font-weight: 800;
+  }
+  .nq__msg {
+    color: var(--sl-color-gray-2);
+  }
+  .nq__ip {
+    margin: 0 0 1rem;
+    color: var(--sl-color-white);
+    font-family: var(--sl-font-mono);
+    font-size: clamp(1.4rem, 4vw, 2rem);
+    font-weight: 700;
+  }
+  .nq__sn {
+    display: grid;
+    gap: 0.6rem;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
+  .nq__sn label {
+    display: grid;
+    gap: 0.25rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+  }
+  .nq__sn .cp-input {
+    font-family: var(--sl-font-mono);
+  }
+  .nq__sn :global(.cp-input.is-ok) {
+    border-color: var(--cp-success);
+  }
+  .nq__sn :global(.cp-input.is-bad) {
+    border-color: var(--cp-danger);
+  }
+  .nq__sn-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    grid-column: 1 / -1;
+  }
+  .nq__how summary {
+    color: var(--sl-color-accent);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .nq__how ol {
+    margin: 0.5rem 0 0;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+  .nq__streak {
+    margin: 0;
+    color: var(--cp-success);
+    font-weight: 700;
+  }
+</style>

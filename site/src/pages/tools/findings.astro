@@ -1,0 +1,421 @@
+---
+// Turns the hardening script's findings report into a clickable to-do list,
+// with each item linked to the matching section of a checklist.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import GithubSlugger from 'github-slugger';
+import { CHECKLISTS, checklistSteps } from '../../data/site';
+
+// For each checklist: its section headings and their anchors.
+const sections: Record<string, { title: string; slug: string }[]> = {};
+for (const c of CHECKLISTS) {
+  const slugger = new GithubSlugger();
+  const seen = new Set<string>();
+  sections[c.id] = [];
+  for (const s of checklistSteps[`checklists/${c.id}`].steps) {
+    if (seen.has(s.section)) continue;
+    seen.add(s.section);
+    sections[c.id].push({ title: s.section, slug: slugger.slug(s.section) });
+  }
+}
+const lists = CHECKLISTS.map((c) => ({ id: c.id, name: c.name }));
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Findings to-do list',
+    description: "Paste the hardening script's findings report and get a clickable to-do list linked to your checklist.",
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="fd cp-wide not-content" data-fd data-sections={JSON.stringify(sections)}>
+    <p class="fd__intro">
+      After the script runs, it writes a findings report: <code>/root/cyberpatriot/findings-*.txt</code> on Linux,{' '}
+      <code>C:\harden-toolkit\findings-*.txt</code> on Windows. Paste it here (or open the file) to get a to-do list. Each item
+      links to the checklist section that explains it.
+    </p>
+
+    <section class="fd__input" data-fd-input>
+      <label class="cp-label" for="fd-text">Findings report</label>
+      <textarea
+        id="fd-text"
+        class="cp-textarea"
+        rows="8"
+        spellcheck="false"
+        placeholder={'# Findings report - ...\n\n## Users and groups\n\n- [ ] REVIEW  (users) User \'mallory\' is not in the README\n- [ ] FAILED  (firewall) Could not enable UFW'}
+        data-fd-text></textarea>
+      <div class="fd__row">
+        <button type="button" class="cp-btn cp-btn--primary" data-fd-parse>Make my to-do list</button>
+        <label class="cp-btn">
+          Open the file…
+          <input type="file" accept=".txt,text/plain" class="cp-visually-hidden" data-fd-file />
+        </label>
+        <span class="fd__msg" role="status" data-fd-msg></span>
+      </div>
+    </section>
+
+    <section class="fd__out" data-fd-out hidden>
+      <div class="fd__bar">
+        <div class="fd__summary">
+          <strong data-fd-count>0 / 0</strong> done
+          <span class="cp-bar fd__progress"><span class="cp-bar__fill" style="width:0%" data-fd-fill></span></span>
+        </div>
+        <label class="fd__select">
+          <span>Checklist</span>
+          <select class="cp-select" data-fd-list>
+            {lists.map((l) => <option value={l.id}>{l.name}</option>)}
+          </select>
+        </label>
+        <div class="cp-segmented" role="group" aria-label="Show" data-fd-filter>
+          <button type="button" data-filter="all" aria-pressed="true">All</button>
+          <button type="button" data-filter="open" aria-pressed="false">Open</button>
+          <button type="button" data-filter="FAILED" aria-pressed="false">Failed</button>
+        </div>
+        <button type="button" class="cp-btn cp-btn--sm cp-btn--ghost" data-fd-new>Paste a new report</button>
+      </div>
+      <div data-fd-groups></div>
+    </section>
+  </div>
+</StarlightPage>
+
+<script>
+  import { getValue, setValue } from '../../scripts/store';
+
+  interface Item {
+    id: string;
+    status: string;
+    section: string;
+    group: string;
+    text: string;
+    details: string[];
+  }
+  interface Saved {
+    items: Item[];
+    done: string[];
+    list: string;
+  }
+
+  const root = document.querySelector<HTMLElement>('[data-fd]')!;
+  const SECTIONS: Record<string, { title: string; slug: string }[]> = JSON.parse(root.dataset.sections as string);
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+
+  // Script section key -> words to look for in a checklist's section titles.
+  const KEYWORDS: Record<string, RegExp> = {
+    users: /users and groups|users/i,
+    passwords: /password/i,
+    firewall: /firewall|defender, firewall/i,
+    ssh: /ssh/i,
+    services: /^\d+\.\s*services|services/i,
+    software: /software/i,
+    files: /files/i,
+    kernel: /kernel/i,
+    permissions: /permission/i,
+    sudoers: /sudo/i,
+    sudo: /sudo/i,
+    backdoors: /backdoor/i,
+    logging: /logging|auditing/i,
+    apparmor: /apparmor/i,
+    desktop: /login screen|screen lock|desktop/i,
+    apps: /critical/i,
+    updates: /update/i,
+    security: /local policies|security options/i,
+    rights: /local policies|user rights/i,
+    audit: /local policies|audit/i,
+    defender: /defender/i,
+    features: /features/i,
+    remote: /remote/i,
+    shares: /shared|share/i,
+    misc: /other settings|the rest/i,
+    browsers: /browser/i,
+    roles: /critical|roles/i,
+  };
+  const WINDOWS_KEYS = ['security', 'rights', 'audit', 'defender', 'features', 'remote', 'shares', 'misc', 'browsers', 'roles'];
+  const LINUX_KEYS = ['apparmor', 'desktop', 'apps', 'sudoers', 'kernel'];
+
+  function parse(text: string): Item[] {
+    const items: Item[] = [];
+    let group = 'Other';
+    for (const raw of text.replace(/\r/g, '').split('\n')) {
+      const h = raw.match(/^##\s+(.+)/);
+      if (h) {
+        group = h[1].trim();
+        continue;
+      }
+      const m = raw.match(/^-\s*\[[ xX]\]\s*(REVIEW|FAILED|WOULD)\s+\(([^)]*)\)\s*(.*)$/);
+      if (m) {
+        items.push({ id: `i${items.length}`, status: m[1], section: m[2].trim(), group, text: m[3].trim(), details: [] });
+        continue;
+      }
+      if (/^\s{2,}\S/.test(raw) && items.length) items[items.length - 1].details.push(raw.trim());
+    }
+    return items;
+  }
+
+  function guessList(items: Item[]): string {
+    const keys = new Set(items.map((i) => i.section));
+    if (WINDOWS_KEYS.some((k) => keys.has(k))) return 'windows-10-11';
+    if (keys.has('sudo') && !keys.has('sudoers')) return 'freebsd';
+    if (LINUX_KEYS.some((k) => keys.has(k))) return 'linux-mint';
+    return getValue<Saved | null>('findings', null)?.list ?? 'linux-mint';
+  }
+
+  function linkFor(list: string, key: string): { title: string; href: string } | null {
+    const re = KEYWORDS[key];
+    if (!re) return null;
+    const secs = SECTIONS[list] ?? [];
+    // Prefer a section that isn't "critical services" unless that's what we want.
+    const hit = secs.find((s) => re.test(s.title) && (key === 'apps' || key === 'roles' || !/critical/i.test(s.title))) ?? secs.find((s) => re.test(s.title));
+    return hit ? { title: hit.title, href: `/checklists/${list}/#${hit.slug}` } : null;
+  }
+
+  let state: Saved | null = getValue<Saved | null>('findings', null);
+  let filter = 'all';
+
+  function save() {
+    setValue('findings', state);
+  }
+
+  function render() {
+    const hasItems = !!state && state.items.length > 0;
+    $('[data-fd-out]').hidden = !hasItems;
+    $('[data-fd-input]').hidden = hasItems;
+    if (!state || !hasItems) return;
+    const done = new Set(state.done);
+    $<HTMLSelectElement>('[data-fd-list]').value = state.list;
+    const n = state.items.filter((i) => done.has(i.id)).length;
+    $('[data-fd-count]').textContent = `${n} / ${state.items.length}`;
+    $('[data-fd-fill]').style.width = `${Math.round((n / state.items.length) * 100)}%`;
+    root.querySelectorAll('[data-fd-filter] button').forEach((b) => b.setAttribute('aria-pressed', String((b as HTMLElement).dataset.filter === filter)));
+
+    const groups = new Map<string, Item[]>();
+    for (const item of state.items) {
+      if (filter === 'open' && done.has(item.id)) continue;
+      if (filter === 'FAILED' && item.status !== 'FAILED') continue;
+      (groups.get(item.group) ?? groups.set(item.group, []).get(item.group)!).push(item);
+    }
+    $('[data-fd-groups]').innerHTML = groups.size
+      ? [...groups]
+          .map(([group, items]) => {
+            const link = linkFor(state!.list, items[0].section);
+            return `<section class="fd__group">
+              <div class="fd__group-head"><h2>${esc(group)}</h2>${
+                link ? `<a href="${link.href}">Checklist: ${esc(link.title)} →</a>` : ''
+              }</div>
+              <ul>${items
+                .map(
+                  (i) => `<li class="fd__item ${done.has(i.id) ? 'is-done' : ''}">
+                  <label><input type="checkbox" data-fd-item="${i.id}" ${done.has(i.id) ? 'checked' : ''}/>
+                  <span class="fd__status fd__status--${i.status.toLowerCase()}">${i.status}</span>
+                  <span class="fd__text">${esc(i.text)}</span></label>
+                  ${
+                    i.details.length
+                      ? `<details class="fd__details"><summary>${i.details.length} more line${i.details.length === 1 ? '' : 's'}</summary><pre>${esc(i.details.join('\n'))}</pre></details>`
+                      : ''
+                  }
+                </li>`,
+                )
+                .join('')}</ul></section>`;
+          })
+          .join('')
+      : '<p class="fd__empty">Nothing to show with this filter.</p>';
+  }
+
+  function load(text: string) {
+    const items = parse(text);
+    const msg = $('[data-fd-msg]');
+    if (!items.length) {
+      msg.textContent = 'No REVIEW, FAILED or WOULD lines found. Paste the whole findings-*.txt file.';
+      return;
+    }
+    if (state?.items.length && !confirm('Replace your current to-do list?')) return;
+    state = { items, done: [], list: guessList(items) };
+    msg.textContent = '';
+    save();
+    render();
+  }
+
+  $('[data-fd-parse]').addEventListener('click', () => load($<HTMLTextAreaElement>('[data-fd-text]').value));
+  $<HTMLInputElement>('[data-fd-file]').addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    (e.target as HTMLInputElement).value = '';
+    if (file) load(await file.text());
+  });
+  $('[data-fd-groups]').addEventListener('change', (e) => {
+    const box = (e.target as HTMLElement).closest<HTMLInputElement>('[data-fd-item]');
+    if (!box || !state) return;
+    const done = new Set(state.done);
+    if (box.checked) done.add(box.dataset.fdItem as string);
+    else done.delete(box.dataset.fdItem as string);
+    state.done = [...done];
+    save();
+    render();
+  });
+  $<HTMLSelectElement>('[data-fd-list]').addEventListener('change', (e) => {
+    if (!state) return;
+    state.list = (e.target as HTMLSelectElement).value;
+    save();
+    render();
+  });
+  $('[data-fd-filter]').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-filter]');
+    if (!b) return;
+    filter = b.dataset.filter as string;
+    render();
+  });
+  $('[data-fd-new]').addEventListener('click', () => {
+    $('[data-fd-input]').hidden = false;
+    $<HTMLTextAreaElement>('[data-fd-text]').focus();
+  });
+  render();
+</script>
+
+<style>
+  .fd {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+  .fd__intro {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+  }
+  .fd__input {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .fd__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .fd__row label {
+    position: relative;
+  }
+  .fd__msg {
+    color: var(--cp-warn);
+    font-size: var(--sl-text-sm);
+  }
+  .fd__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .fd__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+  .fd__summary strong {
+    color: var(--sl-color-white);
+    font-variant-numeric: tabular-nums;
+  }
+  .fd__progress {
+    width: 8rem;
+  }
+  .fd__select {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+  }
+  .fd__select .cp-select {
+    width: auto;
+    padding: 0.35rem 0.6rem;
+  }
+  .fd :global(.fd__group) {
+    margin-top: 1.25rem;
+  }
+  .fd :global(.fd__group-head) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .fd :global(.fd__group-head h2) {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-lg);
+  }
+  .fd :global(.fd__group-head a) {
+    font-size: var(--sl-text-sm);
+  }
+  .fd :global(.fd__group ul) {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .fd :global(.fd__item) {
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--cp-card);
+  }
+  .fd :global(.fd__item label) {
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+    cursor: pointer;
+  }
+  .fd :global(.fd__item input) {
+    flex: none;
+    accent-color: var(--cp-success);
+  }
+  .fd :global(.fd__item.is-done .fd__text) {
+    color: var(--sl-color-gray-3);
+    text-decoration: line-through;
+  }
+  .fd :global(.fd__status) {
+    flex: none;
+    padding: 0 0.45rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+  .fd :global(.fd__status--review) {
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+  }
+  .fd :global(.fd__status--failed) {
+    background: var(--cp-danger-low);
+    color: var(--cp-danger);
+  }
+  .fd :global(.fd__status--would) {
+    background: var(--cp-warn-low);
+    color: var(--cp-warn);
+  }
+  .fd :global(.fd__text) {
+    color: var(--sl-color-gray-1);
+    font-size: var(--sl-text-sm);
+  }
+  .fd :global(.fd__details) {
+    margin: 0.35rem 0 0 1.6rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .fd :global(.fd__details pre) {
+    margin: 0.35rem 0 0;
+    padding: 0.5rem 0.7rem;
+    overflow-x: auto;
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-black);
+    font-family: var(--sl-font-mono);
+  }
+  .fd :global(.fd__empty) {
+    color: var(--sl-color-gray-3);
+  }
+</style>

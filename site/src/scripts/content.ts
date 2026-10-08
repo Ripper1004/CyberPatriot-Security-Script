@@ -12,6 +12,7 @@ import {
   setValue,
   storageAvailable,
 } from './store';
+import { initNames } from './names';
 
 interface StepRef {
   id: string;
@@ -266,5 +267,8 @@ function initLesson() {
 }
 
 const content = document.querySelector<HTMLElement>('.cp-content');
-if (content) initSteps(content);
+if (content) {
+  initSteps(content);
+  initNames(content);
+}
 initLesson();

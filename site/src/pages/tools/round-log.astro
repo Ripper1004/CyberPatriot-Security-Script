@@ -1,0 +1,398 @@
+---
+// Round log: write down every change and the score after it. When the score
+// drops, the changes since the last score are highlighted as suspects.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+const quick = ['Took a snapshot', 'Answered a forensics question', 'Ran the script (Audit)', 'Ran the script (Apply)', 'Started updates'];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Round log',
+    description: 'Write down every change and your score after it. If the score drops, see exactly what to undo.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="rl cp-wide not-content" data-rl>
+    <p class="rl__intro">
+      Log each change as you make it, and type the score when the Scoring Report updates. If the score goes <strong>down</strong>,
+      the changes since the last score are highlighted: one of them caused the penalty.
+    </p>
+
+    <form class="rl__form" data-rl-form autocomplete="off">
+      <div class="rl__fields">
+        <label class="rl__field rl__field--what">
+          <span class="cp-label">What did you change?</span>
+          <input class="cp-input" type="text" placeholder="e.g. deleted user mallory, disabled vsftpd" data-rl-what />
+        </label>
+        <label class="rl__field rl__field--score">
+          <span class="cp-label">Score now (optional)</span>
+          <input class="cp-input" type="number" inputmode="numeric" placeholder="e.g. 42" data-rl-score />
+        </label>
+        <button type="submit" class="cp-btn cp-btn--primary rl__add">Add</button>
+      </div>
+      <div class="rl__quick" aria-label="Quick add">
+        {quick.map((q) => <button type="button" class="rl__chip" data-rl-quick={q}>{q}</button>)}
+      </div>
+    </form>
+
+    <section class="rl__stats" data-rl-stats hidden>
+      <div class="rl__stat"><span>Score</span><strong data-rl-current>–</strong></div>
+      <div class="rl__stat"><span>Changes</span><strong data-rl-changes>0</strong></div>
+      <div class="rl__stat"><span>Penalties found</span><strong data-rl-drops>0</strong></div>
+      <svg class="rl__chart" viewBox="0 0 300 60" preserveAspectRatio="none" aria-label="Score over time" role="img" data-rl-chart></svg>
+    </section>
+
+    <ol class="rl__list" data-rl-list></ol>
+    <p class="rl__empty" data-rl-empty>No entries yet. Start with “Took a snapshot”.</p>
+
+    <div class="rl__actions">
+      <button type="button" class="cp-btn cp-btn--sm" data-rl-copy>Copy as text</button>
+      <button type="button" class="cp-btn cp-btn--sm" data-rl-download>Download .txt</button>
+      <button type="button" class="cp-btn cp-btn--sm cp-btn--ghost cp-btn--danger" data-rl-clear>New image (clear log)</button>
+    </div>
+  </div>
+</StarlightPage>
+
+<script>
+  import { getValue, setValue } from '../../scripts/store';
+
+  interface Entry {
+    id: number;
+    at: number;
+    what: string;
+    score: number | null;
+    undone?: boolean;
+  }
+
+  const root = document.querySelector<HTMLElement>('[data-rl]')!;
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+
+  let log: Entry[] = getValue<Entry[]>('round-log', []);
+  const save = () => setValue('round-log', log);
+
+  const clock = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  /** Time into the round, from the round timer if it is running. */
+  function roundTime(t: number): string {
+    const timer = getValue<{ minutes: number; endAt: number | null; remaining: number | null } | null>('timer', null);
+    if (!timer || timer.endAt === null) return '';
+    const start = timer.endAt - timer.minutes * 60_000;
+    const m = Math.floor((t - start) / 60_000);
+    return m >= 0 && m <= timer.minutes ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} in` : '';
+  }
+
+  /** For each scored entry, the change in score, and which entries are suspects for a drop. */
+  function analyse() {
+    const delta = new Map<number, number>();
+    const suspects = new Set<number>();
+    let last: number | null = null;
+    let since: number[] = [];
+    let drops = 0;
+    for (const e of log) {
+      if (e.score === null) {
+        if (!e.undone) since.push(e.id);
+        continue;
+      }
+      if (last !== null) {
+        const d = e.score - last;
+        delta.set(e.id, d);
+        if (d < 0) {
+          drops++;
+          since.forEach((id) => suspects.add(id));
+          if (e.what) suspects.add(e.id);
+        }
+      }
+      last = e.score;
+      since = [];
+    }
+    return { delta, suspects, drops, last };
+  }
+
+  function render() {
+    const { delta, suspects, drops, last } = analyse();
+    $('[data-rl-empty]').hidden = log.length > 0;
+    $('[data-rl-stats]').hidden = log.length === 0;
+    $('[data-rl-current]').textContent = last === null ? '–' : String(last);
+    $('[data-rl-changes]').textContent = String(log.filter((e) => e.what).length);
+    $('[data-rl-drops]').textContent = String(drops);
+
+    // Score chart
+    const pts = log.filter((e) => e.score !== null).map((e) => e.score as number);
+    const chart = $('[data-rl-chart]');
+    if (pts.length > 1) {
+      const min = Math.min(...pts, 0);
+      const max = Math.max(...pts, 1);
+      const xy = pts.map((p, i) => `${(i / (pts.length - 1)) * 296 + 2},${58 - ((p - min) / (max - min || 1)) * 54}`);
+      chart.innerHTML = `<polyline points="${xy.join(' ')}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" />`;
+    } else chart.innerHTML = '';
+
+    $('[data-rl-list]').innerHTML = [...log]
+      .reverse()
+      .map((e) => {
+        const d = delta.get(e.id);
+        const badge =
+          d === undefined ? '' : `<span class="rl__delta ${d < 0 ? 'is-down' : d > 0 ? 'is-up' : ''}">${d > 0 ? '+' : ''}${d}</span>`;
+        const rt = roundTime(e.at);
+        return `<li class="rl__item ${suspects.has(e.id) ? 'is-suspect' : ''} ${e.undone ? 'is-undone' : ''}" data-id="${e.id}">
+          <span class="rl__time">${clock(e.at)}${rt ? `<small>${rt}</small>` : ''}</span>
+          <span class="rl__what">${e.what ? esc(e.what) : '<em>Score check</em>'}${
+            suspects.has(e.id) && !e.undone ? '<span class="rl__suspect">Score dropped after this. Undo it?</span>' : ''
+          }</span>
+          <span class="rl__score">${e.score === null ? '' : `<b>${e.score}</b>`}${badge}</span>
+          <span class="rl__btns">
+            ${e.what ? `<button type="button" class="cp-btn cp-btn--sm cp-btn--ghost" data-rl-undo>${e.undone ? 'Redo' : 'Undone'}</button>` : ''}
+            <button type="button" class="cp-btn cp-btn--sm cp-btn--ghost" data-rl-del aria-label="Delete entry">✕</button>
+          </span>
+        </li>`;
+      })
+      .join('');
+  }
+
+  function add(what: string, scoreText: string) {
+    const score = scoreText.trim() === '' ? null : Number(scoreText);
+    if (!what.trim() && score === null) return;
+    log.push({ id: Date.now(), at: Date.now(), what: what.trim(), score: Number.isFinite(score as number) ? score : null });
+    save();
+    render();
+  }
+
+  $<HTMLFormElement>('[data-rl-form]').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const what = $<HTMLInputElement>('[data-rl-what]');
+    const score = $<HTMLInputElement>('[data-rl-score]');
+    add(what.value, score.value);
+    what.value = '';
+    score.value = '';
+    what.focus();
+  });
+  root.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    const quick = t.closest<HTMLButtonElement>('[data-rl-quick]');
+    if (quick) add(quick.dataset.rlQuick as string, '');
+    const li = t.closest<HTMLElement>('.rl__item');
+    if (!li) return;
+    const id = Number(li.dataset.id);
+    if (t.closest('[data-rl-del]')) log = log.filter((x) => x.id !== id);
+    else if (t.closest('[data-rl-undo]')) log = log.map((x) => (x.id === id ? { ...x, undone: !x.undone } : x));
+    else return;
+    save();
+    render();
+  });
+
+  const asText = () =>
+    log
+      .map((e) => `${clock(e.at)}  ${e.what || '(score check)'}${e.undone ? ' [undone]' : ''}${e.score === null ? '' : `  -> score ${e.score}`}`)
+      .join('\n');
+  $('[data-rl-copy]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    try {
+      await navigator.clipboard.writeText(asText());
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => (btn.textContent = 'Copy as text'), 1500);
+    } catch {
+      window.prompt('Copy this:', asText());
+    }
+  });
+  $('[data-rl-download]').addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([asText() + '\n'], { type: 'text/plain' }));
+    a.download = `round-log-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $('[data-rl-clear]').addEventListener('click', () => {
+    if (!log.length || !confirm('Clear the whole log? Download it first if you want to keep it.')) return;
+    log = [];
+    save();
+    render();
+  });
+  render();
+  setInterval(render, 60_000);
+</script>
+
+<style>
+  .rl {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.1rem;
+  }
+  .rl__intro {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+  }
+  .rl__form {
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  .rl__fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+  }
+  .rl__field {
+    display: grid;
+    gap: 0.3rem;
+  }
+  .rl__field--what {
+    flex: 1 1 18rem;
+  }
+  .rl__field--score {
+    flex: 0 1 9rem;
+  }
+  .rl__add {
+    min-width: 6rem;
+  }
+  .rl__quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+  }
+  .rl__chip {
+    padding: 0.25rem 0.7rem;
+    border: 1px dashed var(--cp-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font: inherit;
+    font-size: var(--sl-text-xs);
+    cursor: pointer;
+  }
+  .rl__chip:hover {
+    border-color: var(--sl-color-accent);
+    color: var(--sl-color-white);
+  }
+  .rl__stats {
+    display: grid;
+    grid-template-columns: repeat(3, auto) 1fr;
+    gap: 1rem 1.75rem;
+    align-items: center;
+    padding: 0.8rem 1.1rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+  }
+  @media (max-width: 40rem) {
+    .rl__stats {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .rl__chart {
+      grid-column: 1 / -1;
+    }
+  }
+  .rl__stat {
+    display: grid;
+  }
+  .rl__stat span {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .rl__stat strong {
+    color: var(--sl-color-white);
+    font-size: 1.4rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .rl__chart {
+    width: 100%;
+    height: 3rem;
+    color: var(--sl-color-accent);
+  }
+  .rl__list {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rl :global(.rl__item) {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr) auto auto;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--cp-card);
+  }
+  @media (max-width: 40rem) {
+    .rl :global(.rl__item) {
+      grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+    }
+    .rl :global(.rl__btns) {
+      grid-column: 2 / -1;
+    }
+  }
+  .rl :global(.rl__item.is-suspect) {
+    border-color: var(--cp-danger);
+    background: var(--cp-danger-low);
+  }
+  .rl :global(.rl__item.is-undone .rl__what) {
+    color: var(--sl-color-gray-3);
+    text-decoration: line-through;
+  }
+  .rl :global(.rl__time) {
+    display: grid;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+  .rl :global(.rl__time small) {
+    color: var(--sl-color-gray-3);
+    font-size: 0.68rem;
+  }
+  .rl :global(.rl__what) {
+    display: grid;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-sm);
+    overflow-wrap: anywhere;
+  }
+  .rl :global(.rl__what em) {
+    color: var(--sl-color-gray-3);
+  }
+  .rl :global(.rl__suspect) {
+    color: var(--cp-danger);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+  }
+  .rl :global(.rl__score) {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .rl :global(.rl__delta) {
+    padding: 0 0.4rem;
+    border-radius: 999px;
+    background: var(--sl-color-gray-6);
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+  }
+  .rl :global(.rl__delta.is-up) {
+    background: var(--cp-success-low);
+    color: var(--cp-success);
+  }
+  .rl :global(.rl__delta.is-down) {
+    background: var(--cp-danger);
+    color: #fff;
+  }
+  .rl :global(.rl__btns) {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .rl__empty {
+    margin: 0;
+    color: var(--sl-color-gray-3);
+  }
+  .rl__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+</style>

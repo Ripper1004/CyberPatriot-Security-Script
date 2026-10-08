@@ -64,6 +64,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\Harden.ps1
   - glossary quiz
   - script downloads with checksums
   - a progress page with export/import
+  - findings to-do list: paste the script's report and get a clickable list linked to the checklist
+  - round log: write down each change and the score, and see which change caused a penalty
+  - forensics helper: file hashes (MD5, SHA-1, SHA-256), file-type check, Base64 / hex / ROT13 / Caesar decoding
+  - Cisco & Packet Tracer guide, networking quiz and subnetting practice
+- **Your names in commands:** checklist commands use the real README names you type once, including what the Copy buttons copy.
 - **Search, dark mode, mobile layout.** No accounts and no tracking: progress is saved in the browser.
 
 The pages are generated from `docs/` at build time, so **edit `docs/` and the website updates itself**. Setup and local preview: [site/README.md](site/README.md).
