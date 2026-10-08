@@ -1,37 +1,43 @@
-/* Brand theme: navy + sky blue. Starlight reads these variables. */
+/* Brand theme: charcoal + sky blue (dark), warm paper + deep blue (light).
+   Starlight reads the --sl-* variables; --cp-* are our own. */
 
 :root {
   --sl-font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --sl-font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', Consolas, monospace;
+  /* Headings, titles and big numbers */
+  --cp-font-display: 'Space Grotesk Variable', 'Space Grotesk', var(--sl-font);
 
-  /* Dark mode (default) */
-  --sl-color-accent-low: #0c2a45;
+  /* Dark mode (default): neutral charcoal, not navy */
+  --sl-color-accent-low: #0e2a3c;
   --sl-color-accent: #38bdf8;
-  --sl-color-accent-high: #c9ecff;
+  --sl-color-accent-high: #c4e9fd;
   --sl-color-white: #ffffff;
-  --sl-color-gray-1: #e6ecf5;
-  --sl-color-gray-2: #c3cddd;
-  --sl-color-gray-3: #8d9ab0;
-  --sl-color-gray-4: #56637b;
-  --sl-color-gray-5: #2b3549;
-  --sl-color-gray-6: #151d2c;
-  --sl-color-black: #0b1220;
+  --sl-color-gray-1: #eceef2;
+  --sl-color-gray-2: #c4c9d2;
+  --sl-color-gray-3: #8d94a1;
+  --sl-color-gray-4: #555c69;
+  --sl-color-gray-5: #2c313a;
+  --sl-color-gray-6: #1a1d23;
+  --sl-color-black: #111317;
 
   /* Our own tokens */
-  --cp-radius: 0.85rem;
-  --cp-radius-sm: 0.55rem;
+  --cp-radius: 0.75rem;
+  --cp-radius-sm: 0.5rem;
+  --cp-radius-xs: 0.35rem;
   --cp-success: #34d399;
-  --cp-success-low: #0b3a2c;
+  --cp-success-low: #0d3328;
   --cp-warn: #fbbf24;
-  --cp-warn-low: #3d2c07;
+  --cp-warn-low: #382a0b;
   --cp-danger: #f87171;
-  --cp-danger-low: #44161a;
-  --cp-card: #111a2a;
-  --cp-card-hover: #15213a;
-  --cp-border: #243149;
-  --cp-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.55);
-  --cp-glow: radial-gradient(60rem 30rem at 85% -10%, rgb(56 189 248 / 0.16), transparent 60%),
-    radial-gradient(40rem 26rem at -10% 10%, rgb(37 99 235 / 0.14), transparent 60%);
+  --cp-danger-low: #3f1a1c;
+  --cp-card: #171a1f;
+  --cp-card-hover: #1c2027;
+  --cp-raised: #2a2f38; /* selected item inside a segmented control */
+  --cp-well: var(--sl-color-black); /* background of segmented controls */
+  --cp-border: #292e37;
+  --cp-shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 6px 20px -12px rgb(0 0 0 / 0.5);
+  --cp-glow: radial-gradient(50rem 26rem at 80% -12%, rgb(56 189 248 / 0.09), transparent 65%);
+  --cp-grid-line: rgb(255 255 255 / 0.035);
   --cp-gradient: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
 
   --cp-os-windows: #3b82f6;
@@ -42,30 +48,33 @@
   --cp-os-ubuntu: #f97316;
 }
 
+/* Light mode: warm off-white paper, near-black ink */
 :root[data-theme='light'] {
-  --sl-color-accent-low: #d9eefd;
-  --sl-color-accent: #0a64c2;
-  --sl-color-accent-high: #0b3768;
-  --sl-color-white: #0b1220;
-  --sl-color-gray-1: #172033;
-  --sl-color-gray-2: #2f3b52;
-  --sl-color-gray-3: #55627c;
-  --sl-color-gray-4: #8a96ad;
-  --sl-color-gray-5: #cfd7e4;
-  --sl-color-gray-6: #edf1f7;
-  --sl-color-gray-7: #f6f8fb;
-  --sl-color-black: #ffffff;
+  --sl-color-accent-low: #e2edf9;
+  --sl-color-accent: #0a5fb8;
+  --sl-color-accent-high: #0a3566;
+  --sl-color-white: #17161a;
+  --sl-color-gray-1: #24232a;
+  --sl-color-gray-2: #3d3b42;
+  --sl-color-gray-3: #66636b;
+  --sl-color-gray-4: #9a968f;
+  --sl-color-gray-5: #dcd8cf;
+  --sl-color-gray-6: #efece5;
+  --sl-color-gray-7: #f6f4ef;
+  --sl-color-black: #fbfaf7;
 
-  --cp-success: #059669;
-  --cp-success-low: #d6f5e9;
-  --cp-warn: #b45309;
-  --cp-warn-low: #fdf0d5;
-  --cp-danger: #dc2626;
-  --cp-danger-low: #fde2e2;
+  --cp-success: #047857;
+  --cp-success-low: #dcf3e8;
+  --cp-warn: #a14a06;
+  --cp-warn-low: #fbefd6;
+  --cp-danger: #c81e1e;
+  --cp-danger-low: #fbe4e2;
   --cp-card: #ffffff;
-  --cp-card-hover: #f5f9ff;
-  --cp-border: #dbe2ec;
-  --cp-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 10px 24px -14px rgb(15 23 42 / 0.25);
-  --cp-glow: radial-gradient(60rem 30rem at 85% -10%, rgb(56 189 248 / 0.18), transparent 60%),
-    radial-gradient(40rem 26rem at -10% 10%, rgb(37 99 235 / 0.1), transparent 60%);
+  --cp-card-hover: #fffefb;
+  --cp-raised: #ffffff;
+  --cp-well: var(--sl-color-gray-6);
+  --cp-border: #e3dfd6;
+  --cp-shadow: 0 1px 2px rgb(40 30 10 / 0.05), 0 8px 22px -14px rgb(40 30 10 / 0.2);
+  --cp-glow: radial-gradient(50rem 26rem at 80% -12%, rgb(10 95 184 / 0.07), transparent 65%);
+  --cp-grid-line: rgb(40 30 10 / 0.045);
 }

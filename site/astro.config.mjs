@@ -34,6 +34,7 @@ export default defineConfig({
       customCss: [
         '@fontsource-variable/inter',
         '@fontsource-variable/jetbrains-mono',
+        '@fontsource-variable/space-grotesk',
         './src/styles/theme.css',
         './src/styles/site.css',
         './src/styles/print.css',

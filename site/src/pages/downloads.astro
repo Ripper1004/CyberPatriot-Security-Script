@@ -234,6 +234,7 @@ function getCommands(id: string) {
   }
   .dl__files {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.6rem;
   }
   .dl__file {
@@ -249,6 +250,8 @@ function getCommands(id: string) {
   }
   .dl__file-info {
     display: grid;
+    flex: 1 1 12rem;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.15rem;
     min-width: 0;
   }
@@ -267,6 +270,7 @@ function getCommands(id: string) {
   }
   .dl__hash code {
     font-size: inherit;
+    word-break: break-all;
   }
   .dl__file-actions {
     display: flex;

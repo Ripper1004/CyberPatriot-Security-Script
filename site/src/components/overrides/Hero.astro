@@ -3,6 +3,7 @@
 const PAGE_TITLE_ID = '_top'; // same id Starlight uses for page titles
 import Default from '@astrojs/starlight/components/Hero.astro';
 import { SEASON } from '../../data/site';
+import UiIcon from '../UiIcon.astro';
 
 const isHome = Astro.url.pathname === '/' || Astro.url.pathname === '/index.html';
 
@@ -59,7 +60,7 @@ const tagline = data.hero?.tagline;
       </ul>
     </div>
     <div class="cp-hero__chip cp-hero__chip--a">✓ 12 of 64 steps</div>
-    <div class="cp-hero__chip cp-hero__chip--b">⏱ 2:41:07 left</div>
+    <div class="cp-hero__chip cp-hero__chip--b"><UiIcon name="clock" /> 2:41:07 left</div>
   </div>
 </section>
 )}
@@ -71,6 +72,21 @@ const tagline = data.hero?.tagline;
     gap: 2.5rem;
     align-items: center;
     padding: 2.5rem 0 1rem;
+    isolation: isolate;
+  }
+  /* Faint grid behind the hero, fading out at the edges */
+  .cp-hero::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -3rem 0 -1rem;
+    background-image:
+      linear-gradient(var(--cp-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--cp-grid-line) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 75% at 65% 40%, #000 30%, transparent 100%);
+    mask-image: radial-gradient(ellipse 70% 75% at 65% 40%, #000 30%, transparent 100%);
+    pointer-events: none;
   }
   @media (min-width: 60rem) {
     .cp-hero {
@@ -101,10 +117,11 @@ const tagline = data.hero?.tagline;
   .cp-hero__title {
     margin: 0;
     color: var(--sl-color-white);
-    font-size: clamp(2.2rem, 5.5vw, 3.6rem);
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 1.05;
+    font-family: var(--cp-font-display);
+    font-size: clamp(2.3rem, 5.5vw, 3.75rem);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.02;
   }
   .cp-hero__title :global(em) {
     font-style: normal;
@@ -149,9 +166,9 @@ const tagline = data.hero?.tagline;
     background: var(--cp-card);
     box-shadow:
       var(--cp-shadow),
-      0 30px 60px -30px rgb(37 99 235 / 0.45);
+      0 30px 60px -32px rgb(37 99 235 / 0.35);
     overflow: hidden;
-    transform: rotate(-1.5deg);
+    transform: rotate(-1deg);
   }
   .cp-report__bar {
     display: flex;
@@ -190,9 +207,10 @@ const tagline = data.hero?.tagline;
   .cp-report__big {
     margin: 0;
     color: var(--sl-color-white);
+    font-family: var(--cp-font-display);
     font-size: 2.6rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
+    font-weight: 700;
+    letter-spacing: -0.04em;
     line-height: 1.1;
   }
   .cp-report__big small {
@@ -263,6 +281,9 @@ const tagline = data.hero?.tagline;
   }
   .cp-hero__chip {
     position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     padding: 0.45rem 0.8rem;
     border: 1px solid var(--cp-border);
     border-radius: 999px;

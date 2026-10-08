@@ -1,5 +1,7 @@
 ---
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import UiIcon from '../components/UiIcon.astro';
+import type { UiIconName } from '../data/icons';
 import { CHECKLISTS, IMAGE_NAMES, lessons, pages, roundsFor, SEASON, totalSteps } from '../data/site';
 
 const osMark: Record<string, string> = {
@@ -11,52 +13,52 @@ const osMark: Record<string, string> = {
   ubuntu: 'U',
 };
 
-const tools = [
+const tools: { href: string; icon: UiIconName; title: string; text: string }[] = [
   {
     href: '/tools/config-builder/',
-    icon: '⚙️',
+    icon: 'sliders',
     title: 'README config builder',
     text: 'Paste the README’s user list and get a ready-to-use config file and the exact commands to run the script.',
   },
   {
     href: '/tools/round-timer/',
-    icon: '⏱️',
+    icon: 'timer',
     title: 'Round timer',
     text: 'A 4-hour countdown that tells you which phase of the game plan you should be in. Projector-friendly.',
   },
   {
     href: '/tools/commands/',
-    icon: '⌨️',
+    icon: 'terminal',
     title: 'Command finder',
     text: 'Search the important Linux, Windows and FreeBSD commands by what you want to do. One-click copy.',
   },
   {
     href: '/tools/forensics/',
-    icon: '🔍',
+    icon: 'search',
     title: 'Forensics helper',
     text: 'Hash a file (MD5, SHA-256), find out what kind of file it is, and decode Base64, hex, ROT13 and more.',
   },
   {
     href: '/tools/round-log/',
-    icon: '📝',
+    icon: 'clipboard',
     title: 'Round log',
     text: 'Write down each change and your score. If the score drops, it shows which change to undo.',
   },
   {
     href: '/tools/glossary-quiz/',
-    icon: '🧠',
+    icon: 'book',
     title: 'Glossary quiz',
     text: 'Flashcards and a quick quiz for the words you’ll see everywhere: PAM, UAC, SUID, GPO…',
   },
   {
     href: '/downloads/',
-    icon: '⬇️',
+    icon: 'download',
     title: 'Download the scripts',
     text: 'The hardening scripts with one-line download commands for the VM and checksums.',
   },
   {
     href: '/progress/',
-    icon: '📈',
+    icon: 'chart',
     title: 'My progress',
     text: 'Everything you’ve ticked off, in one place. Export it to hand in, or reset for a new image.',
   },
@@ -236,8 +238,8 @@ const rules = [
         {
           tools.map((t) => (
             <a class="cp-card cp-tool" href={t.href}>
-              <span class="cp-tool__icon" aria-hidden="true">
-                {t.icon}
+              <span class="cp-tool__icon">
+                <UiIcon name={t.icon} />
               </span>
               <h3 class="cp-card__title">{t.title}</h3>
               <p class="cp-card__text">{t.text}</p>
@@ -387,6 +389,7 @@ const rules = [
     text-transform: uppercase;
   }
   .cp-continue__title {
+    font-family: var(--cp-font-display);
     font-size: var(--sl-text-lg);
     font-weight: 700;
   }
@@ -429,9 +432,10 @@ const rules = [
   .cp-stats dd {
     margin: 0;
     color: var(--sl-color-white);
-    font-size: 1.9rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
+    font-family: var(--cp-font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
   }
 
   /* Learning path */
@@ -476,7 +480,8 @@ const rules = [
     border-radius: 50%;
     background: var(--sl-color-accent-low);
     color: var(--sl-color-accent-high);
-    font-weight: 800;
+    font-family: var(--cp-font-display);
+    font-weight: 700;
   }
   .cp-path__check,
   .cp-path__read {
@@ -553,8 +558,9 @@ const rules = [
     border-radius: 0.75rem;
     background: color-mix(in srgb, var(--os) 18%, transparent);
     color: var(--os);
-    font-size: 0.85rem;
-    font-weight: 800;
+    font-family: var(--cp-font-display);
+    font-size: 0.9rem;
+    font-weight: 700;
     letter-spacing: -0.02em;
   }
   :root[data-theme='dark'] .cp-os__mark {
@@ -614,8 +620,9 @@ const rules = [
   .cp-timeline__name {
     margin: 0.2rem 0 0.75rem;
     color: var(--sl-color-white);
+    font-family: var(--cp-font-display);
     font-size: var(--sl-text-lg);
-    font-weight: 750;
+    font-weight: 650;
   }
   .cp-timeline__images {
     display: flex;
@@ -643,8 +650,13 @@ const rules = [
     width: 2.75rem;
     height: 2.75rem;
     border-radius: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--sl-color-accent) 30%, transparent);
     background: var(--sl-color-accent-low);
-    font-size: 1.35rem;
+    color: var(--sl-color-accent);
+  }
+  .cp-tool__icon :global(.cp-icon) {
+    width: 1.35rem;
+    height: 1.35rem;
   }
 
   /* Rules */
