@@ -4,10 +4,10 @@ import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
 import { CHECKLISTS, LEARNING_PATH, REPO_URL } from './src/data/catalog.mjs';
 
-// Cloudflare Pages sets CF_PAGES_URL during builds. Set SITE_URL in the
-// Cloudflare dashboard to your real address (e.g. https://cp-toolkit.pages.dev)
-// for correct canonical links and sitemap.
-const site = process.env.SITE_URL || process.env.CF_PAGES_URL || 'https://cyberpatriot-toolkit.pages.dev';
+// The site's public address, used for canonical links and the sitemap.
+// Override with a SITE_URL environment variable (e.g. for a custom domain).
+// CF_PAGES_URL is not used: it is the one-off address of each deployment.
+const site = process.env.SITE_URL || 'https://cp-toolkit.pages.dev';
 
 /** @type {Record<string, { text: string; variant: 'note' | 'default' }>} */
 const checklistBadges = {
