@@ -7,7 +7,7 @@ Linux Mint is in **Round 1, the State round, and the Semifinals** this season. I
 - Each item has: **What** · **Why it matters** · **Clicking** (the GUI way) · **Typing** (terminal commands) · **Check it worked** · and sometimes a ⚠️ warning about when *not* to do it.
 - `alice`, `bob` etc. are example names. **Use the names from your README.**
 - New to the terminal? Read [Linux terminal basics](../start-here/linux-terminal-basics.md) first (10 minutes).
-- The script `scripts/linux/harden.sh` can do most of this for you. See [Using the scripts](../start-here/using-the-scripts.md). This checklist teaches you what it's doing, and covers what it can't decide.
+- The script `scripts/linux/harden.sh` can do a lot of this for you. Run it at [step 1.2](#12-fast-path-run-the-hardening-script), then skip the steps marked **Script: ✅**. See [Using the scripts](../start-here/using-the-scripts.md). This checklist teaches you what it's doing, and covers what it can't decide.
 
 ---
 
@@ -16,10 +16,14 @@ Linux Mint is in **Round 1, the State round, and the Semifinals** this season. I
 ### 0.1 Read the README
 - [ ] Done
 
+**Script:** ✋ Not done by the script. Do this by hand.
+
 Write down the admins, users, critical services, required software and prohibited items. See [Reading the README](../start-here/reading-the-readme.md).
 
 ### 0.2 Take a snapshot
 - [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
 
 **What:** Save the current state of the VM so you can go back if you break it.
 
@@ -31,6 +35,8 @@ Write down the admins, users, critical services, required software and prohibite
 ### 0.3 Open a terminal and check you have admin rights
 - [ ] Done
 
+**Script:** ✋ Not done by the script. Do this by hand.
+
 **Typing:** press **Ctrl + Alt + T**, then:
 ```bash
 sudo -v        # asks for YOUR password; no error = you are an admin
@@ -40,6 +46,8 @@ whoami         # shows which user you are logged in as
 ### 0.4 Open the Scoring Report
 - [ ] Done
 
+**Script:** ✋ Not done by the script. Do this by hand.
+
 Double-click **Scoring Report** on the desktop. Keep it open in a browser tab and refresh it as you work.
 
 ---
@@ -48,6 +56,8 @@ Double-click **Scoring Report** on the desktop. Keep it open in a browser tab an
 
 ### 1.1 Answer every forensics question before changing anything
 - [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
 
 **What:** Open each `Forensics Question N.txt` on the desktop, find the answer, and type it after `ANSWER:` in the file, then save.
 
@@ -66,12 +76,44 @@ More techniques: [Forensics questions guide](../guides/forensics-questions.md).
 > [!WARNING]
 > Answers must be **exact**: right spelling, capitals, and full paths when asked. Don't delete the "ANSWER:" line.
 
+### 1.2 Fast path: run the hardening script
+- [ ] Done
+
+**What:** Once **every forensics question is answered**, run the toolkit's script `scripts/linux/harden.sh`. It fixes many of the steps below for you and gives you a to-do list for the rest.
+
+**Why it matters:** The script does in a few minutes what takes an hour by hand, and it backs up every file before changing it. That leaves you more time for the steps that need a human.
+
+**Typing:**
+1. Get the toolkit onto the image (git or ZIP download): see [Using the scripts](../start-here/using-the-scripts.md).
+2. Optional: make a config file with the README config builder on the website and save it as `my.conf` in the `scripts/linux` folder. No config? Leave out `--config my.conf` and the script asks you for the README names instead.
+3. Run it in **audit** mode first (it changes nothing) and read every `REVIEW` line. Then run it in **apply** mode:
+```bash
+cd CyberPatriot-Security-Script/scripts/linux       # or wherever you unzipped it
+sudo bash harden.sh --audit --config my.conf        # report only: read the REVIEW lines
+sudo bash harden.sh --apply --config my.conf        # make the changes (it asks before risky ones)
+sudo cat /root/cyberpatriot/findings-*.txt          # your to-do list: every REVIEW item
+```
+
+**Check it worked:** The summary at the end shows mostly `OK` and `CHANGED`. Refresh the **Scoring Report**: your score should have gone up.
+
+Every step below has a **Script:** line:
+- **✅** the script does the whole step.
+- **🔎** the script does part of it or only reports it. Finish it yourself.
+- **✋** the script doesn't do it. Do it by hand.
+
+Now skip every step marked **Script: ✅** below (on the website, press **Tick the script's ✅ steps** at the top of the page). Do the 🔎 and ✋ steps.
+
+> [!WARNING]
+> If any line says `FAILED`, do that step by hand. If your score goes **down**, find the change that caused it and undo it from the backups in `/root/cyberpatriot/backups/` (see [Using the scripts](../start-here/using-the-scripts.md#undoing-a-change)).
+
 ---
 
 ## 2. Users and groups
 
 ### 2.1 See every user on the computer
 - [ ] Done
+
+**Script:** 🔎 The script shows the users on this machine and flags every one that isn't in the README; you still type the README names in correctly.
 
 **What:** Get the list of real (human) users and compare it with the README.
 
@@ -85,6 +127,8 @@ This prints every user with a user ID (UID) of 1000 or more, which means the rea
 
 ### 2.2 Delete users who are not in the README
 - [ ] Done
+
+**Script:** ✅ Done by the script (`users` section).
 
 **What:** Remove each account that isn't listed as an authorized admin or user.
 
@@ -105,6 +149,8 @@ sudo userdel mallory          # delete the account (keeps /home/mallory for now)
 ### 2.3 Create users the README says should exist
 - [ ] Done
 
+**Script:** 🔎 The script creates missing README users (and makes README admins administrators), but they only get a password if you give it one (NEW_PASSWORD or when asked).
+
 **Clicking:** **Users and Groups → Add** (the "+" button), choose Standard or Administrator, enter the name, then set a password.
 
 **Typing:**
@@ -114,6 +160,8 @@ sudo adduser erin             # asks for a password and details
 
 ### 2.4 Fix who is an administrator
 - [ ] Done
+
+**Script:** ✅ Done by the script (`users` section).
 
 **What:** Only the README's admins should be in the `sudo` group (that's what "Administrator" means on Mint).
 
@@ -131,6 +179,8 @@ getent group adm                        # 'adm' can read logs - normally admins 
 
 ### 2.5 Look for hidden root accounts and hidden users
 - [ ] Done
+
+**Script:** 🔎 The script finds UID-0 and hidden login accounts and offers to delete them or block their logins; you decide for each hidden user (say no if it belongs to a program).
 
 **What:** Find accounts with UID 0 (secret root copies), and accounts with a low UID that can still log in.
 
@@ -152,6 +202,8 @@ sudo usermod -s /usr/sbin/nologin sysbackup     # stop a hidden user from loggin
 ### 2.6 Check other powerful groups
 - [ ] Done
 
+**Script:** 🔎 The script removes non-admins from root, shadow, disk, kmem, docker and lxd (it asks first); check `sambashare` and any admins in these groups yourself.
+
 **Typing:**
 ```bash
 for g in root shadow disk lxd docker sambashare; do getent group $g; done
@@ -163,6 +215,8 @@ sudo gpasswd -d carol shadow
 
 ### 2.7 Give users strong passwords
 - [ ] Done
+
+**Script:** 🔎 The script gives every authorized user except you one strong password only if you set NEW_PASSWORD or type one when asked; otherwise do this by hand.
 
 **What:** Change every authorized user's password (except your own, unless the README says so) to something strong.
 
@@ -182,6 +236,8 @@ Use 12+ characters with upper case, lower case, a number and a symbol, e.g. `Blu
 ### 2.8 Lock the root account
 - [ ] Done
 
+**Script:** ✅ Done by the script (`users` section).
+
 **What:** Make sure nobody can log in directly as `root`. Admins use `sudo` instead.
 
 **Typing:**
@@ -199,6 +255,8 @@ sudo passwd -l root      # lock it
 
 ### 3.1 Password aging (how long passwords last)
 - [ ] Done
+
+**Script:** ✅ Done by the script (`passwords` section).
 
 **What:** Passwords expire after 90 days, can't be changed again for 7 days, and users get 14 days' warning.
 
@@ -219,6 +277,8 @@ Save with **Ctrl+O, Enter**, exit with **Ctrl+X**.
 ### 3.2 Apply aging to the users who already exist
 - [ ] Done
 
+**Script:** ✅ Done by the script (`passwords` section).
+
 **Why:** `login.defs` only affects **new** users.
 
 **Typing (repeat for each user):**
@@ -229,6 +289,8 @@ sudo chage -l bob            # check: "Maximum number of days" = 90
 
 ### 3.3 Password complexity (pwquality)
 - [ ] Done
+
+**Script:** ✅ Done by the script (`passwords` section).
 
 **What:** Make Linux reject weak passwords when someone changes theirs.
 
@@ -261,6 +323,8 @@ It should look like: `password requisite pam_pwquality.so retry=3 ...`. You can 
 ### 3.4 Password history (no re-using old passwords)
 - [ ] Done
 
+**Script:** ✅ Done by the script (`passwords` section).
+
 **Typing:**
 ```bash
 sudo nano /etc/pam.d/common-password
@@ -272,6 +336,8 @@ password  [success=1 default=ignore]  pam_unix.so obscure use_authtok try_first_
 
 ### 3.5 No logins with an empty password
 - [ ] Done
+
+**Script:** ✅ Done by the script (`passwords` section).
 
 **What:** Remove the word `nullok` from `/etc/pam.d/common-auth`.
 
@@ -285,6 +351,8 @@ sudo sed -i 's/ nullok//' /etc/pam.d/common-auth
 
 ### 3.6 Account lockout after failed logins (careful!)
 - [ ] Done
+
+**Script:** 🔎 The script turns on lockout only if ENABLE_LOCKOUT=yes or you answer yes when asked; then do the `su - bob` test in a new terminal.
 
 **What:** Lock an account for 15 minutes after 5 wrong passwords.
 
@@ -328,6 +396,8 @@ sudo sed -i 's/ nullok//' /etc/pam.d/common-auth
 ### 4.1 Turn on the firewall
 - [ ] Done
 
+**Script:** ✅ Done by the script (`firewall` section).
+
 **What:** Block every incoming connection except the ones the README needs.
 
 **Clicking:** **Menu → Administration → Firewall Configuration**. Switch **Status** on, set **Incoming: Deny** and **Outgoing: Allow**.
@@ -346,6 +416,8 @@ sudo ufw logging on
 ### 4.2 Allow the critical services (and nothing else)
 - [ ] Done
 
+**Script:** 🔎 The script opens the ports for the critical services you entered (plus EXTRA_PORTS); check `sudo ufw status` matches the README, especially for services it doesn't know.
+
 | README needs | Command |
 |---|---|
 | SSH | `sudo ufw allow 22/tcp` |
@@ -357,6 +429,8 @@ sudo ufw logging on
 
 ### 4.3 Remove rules an attacker added
 - [ ] Done
+
+**Script:** 🔎 The script lists `allow` rules that aren't for a critical service under REVIEW; you decide which to delete.
 
 **Typing:**
 ```bash
@@ -375,6 +449,8 @@ Look for odd ports like 4444, 1337, 31337, 6667, or "ALLOW Anywhere" on a port n
 ### 5.1 Install all updates
 - [ ] Done
 
+**Script:** 🔎 The script installs all updates only if FULL_UPGRADE=yes or you say yes when asked; otherwise do it here.
+
 **Clicking:** **Menu → Administration → Update Manager** → **Refresh** → **Install Updates**. If it asks to update itself first, say yes.
 
 **Typing:**
@@ -385,6 +461,8 @@ sudo apt full-upgrade -y
 
 ### 5.2 Turn on automatic updates
 - [ ] Done
+
+**Script:** 🔎 The script sets up `20auto-upgrades` and turns on Mint's automatic updates; just check the Update Manager Options tab refreshes automatically.
 
 **Clicking:** **Update Manager → Edit → Preferences → Automation** → turn on **Apply updates automatically**. On the **Options** tab, make sure it refreshes the list of updates automatically.
 
@@ -404,6 +482,8 @@ APT::Periodic::AutocleanInterval "7";
 ### 5.3 Check the software sources
 - [ ] Done
 
+**Script:** 🔎 The script flags unofficial sources, `[trusted=yes]` and a missing security source under REVIEW; you remove the bad ones.
+
 **What:** Make sure updates come from the official Mint and Ubuntu servers only.
 
 **Clicking:** **Menu → Administration → Software Sources**. Look at **PPAs** and **Additional repositories**. Remove anything you don't recognise. Make sure the official repositories are enabled.
@@ -417,6 +497,8 @@ Official addresses: `packages.linuxmint.com`, `archive.ubuntu.com`, `security.ub
 ### 5.4 Packages "held" back from updating
 - [ ] Done
 
+**Script:** ✅ Done by the script (`updates` section).
+
 ```bash
 apt-mark showhold              # anything listed will never update
 sudo apt-mark unhold <name>
@@ -424,6 +506,8 @@ sudo apt-mark unhold <name>
 
 ### 5.5 Update the apps the README mentions
 - [ ] Done
+
+**Script:** 🔎 Done only if the script installed all updates (FULL_UPGRADE=yes or you said yes); still check Firefox's version.
 
 Firefox, Thunderbird, LibreOffice and any critical service are updated by 5.1. Check Firefox with **Menu (≡) → Help → About Firefox**.
 
@@ -434,6 +518,8 @@ Firefox, Thunderbird, LibreOffice and any critical service are updated by 5.1. C
 ### 6.1 See what's running and listening
 - [ ] Done
 
+**Script:** 🔎 The script puts the running services and listening ports in the findings report; you still look through them for anything odd.
+
 **Typing:**
 ```bash
 systemctl list-units --type=service --state=running
@@ -442,6 +528,8 @@ sudo ss -tulpn             # programs listening on network ports
 
 ### 6.2 Turn off services the README doesn't need
 - [ ] Done
+
+**Script:** 🔎 The script offers to stop (or remove) known services the README doesn't list; SSH, uninstalling, and services it doesn't know about are your call.
 
 **Typing:**
 ```bash
@@ -469,6 +557,8 @@ sudo apt purge vsftpd                      # remove it completely (if the README
 ### 6.3 Make sure the critical services are running
 - [ ] Done
 
+**Script:** 🔎 The script starts the critical services it recognises from your list; check each one with `systemctl status`.
+
 ```bash
 systemctl status ssh             # "active (running)" in green = good
 sudo systemctl enable --now ssh  # start it if it isn't
@@ -480,6 +570,8 @@ sudo systemctl enable --now ssh  # start it if it isn't
 
 ### 7.1 Hacking tools
 - [ ] Done
+
+**Script:** 🔎 The script removes known hacking-tool packages (it asks first), but only reports `netcat-openbsd` and hand-copied tools; check its REVIEW lines.
 
 **Clicking:** **Menu → Administration → Synaptic Package Manager**. Search each name, right-click → **Mark for Complete Removal** → **Apply**.
 
@@ -493,6 +585,8 @@ sudo apt autoremove
 ### 7.2 Games
 - [ ] Done
 
+**Script:** 🔎 The script removes the games on its list (it asks first); look for any others and run `sudo apt autoremove`.
+
 ```bash
 dpkg -l | grep -Ei 'aisleriot|gnome-mines|gnome-sudoku|mahjongg|minetest|supertux|freeciv|0ad|wesnoth|bsdgames|steam'
 sudo apt purge aisleriot gnome-mines
@@ -500,6 +594,8 @@ sudo apt purge aisleriot gnome-mines
 
 ### 7.3 File-sharing and remote-access programs
 - [ ] Done
+
+**Script:** 🔎 The script removes known torrent and remote-access programs, snaps and flatpaks (it asks first); check its REVIEW lines for any it skipped.
 
 ```bash
 dpkg -l | grep -Ei 'transmission|qbittorrent|deluge|frostwire|teamviewer|anydesk|x11vnc|tightvnc|vino'
@@ -510,6 +606,8 @@ snap list 2>/dev/null; flatpak list 2>/dev/null
 
 ### 7.4 Media files (music and video)
 - [ ] Done
+
+**Script:** 🔎 The script lists media files and offers to delete them all at once; read the list first and say no if any must stay (forensics, a website).
 
 **Typing:**
 ```bash
@@ -523,6 +621,8 @@ sudo rm "/home/bob/Music/song.mp3"
 ### 7.5 Other files that break policy
 - [ ] Done
 
+**Script:** 🔎 The script lists password lists, packet captures and similar files under REVIEW; you open each one and decide.
+
 Password lists, credit card or social security number files, packet captures (`.pcap`), and hacking scripts:
 ```bash
 sudo find /home /root /tmp /opt -type f \( -iname '*password*' -o -iname '*.pcap' -o -iname '*creditcard*' -o -iname '*.kdbx' \) 2>/dev/null
@@ -535,6 +635,8 @@ sudo ls -la /home/*/ /tmp /var/tmp /opt     # look for anything odd, including h
 
 ### 8.1 No guest sessions and no automatic login
 - [ ] Done
+
+**Script:** 🔎 The script turns off guest sessions and auto-login in the LightDM files; run the `grep -r autologin /etc/lightdm/` check to be sure no user name is left.
 
 **Clicking:** **Menu → Administration → Login Window → Users** tab. Turn **Allow guest sessions** off. Clear the **Automatic login** username.
 
@@ -552,6 +654,8 @@ Also check: `grep -r autologin /etc/lightdm/`
 
 ### 8.2 Lock the screen when idle
 - [ ] Done
+
+**Script:** 🔎 The script sets a 5-minute screen lock for all users with dconf; run the `gsettings` check, and set it by hand if the script says REVIEW.
 
 **Clicking:** **Menu → System Settings → Screensaver**:
 - **Delay before starting the screensaver:** 5 minutes
@@ -571,6 +675,8 @@ dpkg -l openssh-server       # "ii" at the start = installed
 ### 9.1 Not needed? Remove it.
 - [ ] Done
 
+**Script:** 🔎 If the README doesn't list SSH, the script offers to stop and disable it (default no); removing `openssh-server` is up to you.
+
 If the README doesn't mention SSH or remote logins:
 ```bash
 sudo systemctl disable --now ssh
@@ -579,6 +685,8 @@ sudo apt purge openssh-server
 
 ### 9.2 Needed? Make it safe.
 - [ ] Done
+
+**Script:** ✅ Done by the script (`ssh` section).
 
 ```bash
 sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
@@ -612,6 +720,8 @@ sudo sshd -t && sudo systemctl reload ssh       # sshd -t prints nothing if the 
 ### 9.3 Check for override files
 - [ ] Done
 
+**Script:** ✅ Done by the script (`ssh` section).
+
 Files in `/etc/ssh/sshd_config.d/` are read **first**, and for SSH the first value wins, so they override everything above:
 ```bash
 grep -r . /etc/ssh/sshd_config.d/ 2>/dev/null
@@ -620,6 +730,8 @@ sudo sshd -T | grep -Ei 'permitrootlogin|permitemptypasswords|passwordauthentica
 
 ### 9.4 Planted SSH keys
 - [ ] Done
+
+**Script:** 🔎 The script lists every `authorized_keys` file and offers to delete it (yes for root, no for others by default); you decide for each user.
 
 ```bash
 sudo find / -name 'authorized_keys*' 2>/dev/null -exec ls -la {} \; -exec cat {} \;
@@ -632,6 +744,8 @@ A key in `/root/.ssh/authorized_keys` or in an unauthorized user's folder is alm
 
 ### 10.1 Turn on network and memory protections
 - [ ] Done
+
+**Script:** ✅ Done by the script (`kernel` section).
 
 **Typing:**
 ```bash
@@ -671,6 +785,8 @@ sudo sysctl -p
 ### 11.1 Password files
 - [ ] Done
 
+**Script:** ✅ Done by the script (`permissions` section).
+
 ```bash
 ls -l /etc/passwd /etc/shadow /etc/group /etc/gshadow
 sudo chmod 644 /etc/passwd /etc/group
@@ -680,6 +796,8 @@ sudo chown root:shadow /etc/shadow /etc/gshadow
 
 ### 11.2 SUID programs (run as root for anyone)
 - [ ] Done
+
+**Script:** 🔎 The script removes SUID from known-dangerous programs like `find` or `vim` (it asks first) and lists unknown ones under REVIEW for you to look up.
 
 **Why:** If `find`, `vim`, `bash` or `python3` has the SUID bit, any user can become root with one command.
 
@@ -692,6 +810,8 @@ Normal SUID programs include `passwd`, `sudo`, `su`, `mount`, `umount`, `chsh`, 
 ### 11.3 Files anyone can change
 - [ ] Done
 
+**Script:** ✅ Done by the script (`permissions` section).
+
 ```bash
 sudo find / -xdev -type f -perm -0002 ! -path '/proc/*' ! -path '/sys/*' 2>/dev/null
 sudo chmod o-w /path/to/file
@@ -699,6 +819,8 @@ sudo chmod o-w /path/to/file
 
 ### 11.4 Home folders
 - [ ] Done
+
+**Script:** ✅ Done by the script (`permissions` section).
 
 ```bash
 ls -ld /home/*
@@ -711,6 +833,8 @@ sudo chmod 750 /home/bob        # other users can't look inside
 
 ### 12.1 Check /etc/sudoers and /etc/sudoers.d/
 - [ ] Done
+
+**Script:** 🔎 The script removes `NOPASSWD` and `!authenticate` and offers to disable rules for non-admins; read the files again afterwards, because a rule can survive.
 
 **Typing:**
 ```bash
@@ -738,6 +862,8 @@ sudo visudo -f /etc/sudoers.d/90-bob # a file in sudoers.d
 ### 13.1 Scheduled jobs (cron)
 - [ ] Done
 
+**Script:** 🔎 The script removes cron jobs that look malicious (it asks first) and lists the rest under REVIEW; you check the others.
+
 ```bash
 sudo ls -la /var/spool/cron/crontabs/                  # one file per user
 for u in $(cut -d: -f1 /etc/passwd); do sudo crontab -l -u $u 2>/dev/null | grep -v '^#' | sed "s/^/$u: /"; done
@@ -749,6 +875,8 @@ Red flags: `nc`, `ncat`, `bash -i`, `/dev/tcp/`, `curl ... | bash`, `wget`, `bas
 
 ### 13.2 Services that start a backdoor at boot
 - [ ] Done
+
+**Script:** 🔎 The script lists services that didn't come from a package and offers to disable obviously bad ones; you check the rest and delete the unit files.
 
 ```bash
 systemctl list-unit-files --type=service --state=enabled
@@ -762,6 +890,8 @@ sudo systemctl disable --now evil.service && sudo rm /etc/systemd/system/evil.se
 ### 13.3 Programs listening for connections
 - [ ] Done
 
+**Script:** 🔎 The script offers to kill netcat-style listeners and lists every listening port under REVIEW; you still find what starts them.
+
 ```bash
 sudo ss -tulpn
 ```
@@ -769,6 +899,8 @@ sudo ss -tulpn
 
 ### 13.4 Start-up files and fake commands
 - [ ] Done
+
+**Script:** 🔎 The script comments out suspicious lines and fake aliases in shell start-up files (it asks first); `rc.local`, `/etc/profile.d` and fake commands are only listed under REVIEW.
 
 ```bash
 cat /etc/rc.local 2>/dev/null
@@ -780,6 +912,8 @@ Watch for aliases that hijack commands, e.g. `alias sudo='...'` or `alias ls='..
 ### 13.5 The hosts file
 - [ ] Done
 
+**Script:** ✅ Done by the script (`backdoors` section).
+
 ```bash
 cat /etc/hosts
 ```
@@ -787,6 +921,8 @@ Only `127.0.0.1 localhost`, `127.0.1.1 <this computer's name>` and the `ip6-` li
 
 ### 13.6 Hidden root-kit tricks
 - [ ] Done
+
+**Script:** 🔎 The script disables `/etc/ld.so.preload` and `auth sufficient pam_permit.so` lines (it asks first); still read `common-auth` for other `pam_permit` tricks.
 
 ```bash
 cat /etc/ld.so.preload 2>/dev/null          # should not exist or be empty
@@ -796,12 +932,16 @@ grep -n 'pam_permit' /etc/pam.d/common-auth # "auth sufficient pam_permit.so" = 
 ### 13.7 Programs that start when someone logs in
 - [ ] Done
 
+**Script:** 🔎 The script lists autostart entries under REVIEW; you decide which to remove.
+
 **Clicking:** **Menu → Preferences → Startup Applications**.
 
 **Typing:** `ls /etc/xdg/autostart/ /home/*/.config/autostart/`
 
 ### 13.8 Tampered system programs
 - [ ] Done
+
+**Script:** 🔎 The script reinstalls packages whose programs were changed (it asks first); other changed files in the `dpkg --verify` output are up to you.
 
 ```bash
 sudo dpkg --verify | grep -v ' c '           # lines with a 5 = changed file
@@ -810,6 +950,8 @@ Fix by reinstalling the package that owns it: `dpkg -S /usr/bin/ls`, then `sudo 
 
 ### 13.9 Malware scanners (optional, slow)
 - [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
 
 ```bash
 sudo apt install clamav rkhunter
@@ -823,6 +965,8 @@ sudo rkhunter --check --sk
 
 ### 14.1 System logs and the audit daemon
 - [ ] Done
+
+**Script:** ✅ Done by the script (`logging` section).
 
 ```bash
 sudo apt install auditd rsyslog
@@ -843,6 +987,8 @@ sudo augenrules --load
 
 ### 15.1 Make sure AppArmor is on
 - [ ] Done
+
+**Script:** ✅ Done by the script (`apparmor` section).
 
 ```bash
 sudo aa-status

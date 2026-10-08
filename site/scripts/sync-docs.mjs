@@ -31,6 +31,20 @@ const ALERTS = {
   CAUTION: { type: 'danger', title: 'Careful' },
 };
 
+// "**Script:** ✅ ..." lines under a step say whether the hardening script does it.
+const SCRIPT_TAGS = { '✅': 'auto', '🔎': 'review', '✋': 'manual' };
+const SCRIPT_LINE = /^\*\*Script:\*\*\s*(✅|🔎|✋)\s*(.*)$/u;
+
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+/** Minimal inline Markdown -> HTML for one-line notes (code, bold, links). */
+function inlineHtml(md) {
+  return esc(md)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2">$1</a>');
+}
+
 const fail = (msg) => {
   console.error(`sync-docs: ${msg}`);
   process.exit(1);
@@ -99,6 +113,8 @@ function convert(docPath, source) {
   let section = '';
   let itemsUnderHeading = 0;
   let alert = null; // { indent, lines[] }
+  let awaitingScript = null; // { step, markerIndex } right after a "- [ ] Done"
+
 
   const flushAlert = () => {
     if (!alert) return;
@@ -137,6 +153,24 @@ function convert(docPath, source) {
     if (inFence) {
       out.push(line);
       continue;
+    }
+
+    // "**Script:** ✅/🔎/✋ ..." tag for the step just above
+    if (awaitingScript && line.trim()) {
+      const tag = line.trim().match(SCRIPT_LINE);
+      const pending = awaitingScript;
+      awaitingScript = null;
+      if (tag) {
+        const kind = SCRIPT_TAGS[tag[1]];
+        pending.step.script = kind;
+        out[pending.markerIndex] = out[pending.markerIndex].replace('class="cp-step"', `class="cp-step" data-cp-script="${kind}"`);
+        const text = tag[2].replace(/\]\(([^)\s]+)\)/g, (_, target) => `](${rewriteLink(target, docPath)})`);
+        out.push(
+          `<p class="cp-script cp-script--${kind}"><span class="cp-script__icon" aria-hidden="true">${tag[1]}</span><span><span class="cp-script__label">Script:</span> ${inlineHtml(text)}</span></p>`,
+          '',
+        );
+        continue;
+      }
     }
 
     // GitHub alerts -> Starlight asides
@@ -178,8 +212,10 @@ function convert(docPath, source) {
       const isDone = task[2].trim() === 'Done';
       const id = isDone ? heading.slug : `${heading.slug}--${itemsUnderHeading}`;
       if (steps.some((s) => s.id === id)) fail(`${docPath}: duplicate step id ${id}`);
-      steps.push({ id, title: isDone ? heading.text : inlineText(task[2]), section: section || heading.text });
+      const step = { id, title: isDone ? heading.text : inlineText(task[2]), section: section || heading.text };
+      steps.push(step);
       if (isDone) {
+        awaitingScript = { step, markerIndex: out.length };
         out.push(
           `<div class="cp-step" data-cp-step="${id}"><label class="cp-step__label"><input type="checkbox" class="cp-step__box" /><span class="cp-step__text">Mark this step done</span></label></div>`,
         );
@@ -199,6 +235,7 @@ function convert(docPath, source) {
   const markdown = out
     .join('\n')
     .replace(/\n*(<div class="cp-step"[^\n]*<\/div>)\n*/g, '\n\n$1\n\n')
+    .replace(/\n*(<p class="cp-script[^\n]*<\/p>)\n*/g, '\n\n$1\n\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   return { markdown, title, description, steps };
@@ -278,6 +315,13 @@ function main() {
     const outFile = join(OUT_DOCS, `${slug}.md`);
     mkdirSync(dirname(outFile), { recursive: true });
     writeFileSync(outFile, `${fm}${markdown}\n`);
+
+    if (isChecklist) {
+      const untagged = steps.filter((s) => !s.id.includes('--') && !s.script && !/fast path/i.test(s.title));
+      if (untagged.length) {
+        fail(`${docPath}: these steps need a "**Script:** ✅/🔎/✋ ..." line under "- [ ] Done": ${untagged.map((s) => s.title).join('; ')}`);
+      }
+    }
 
     pages[slug] = { title, description, route: routeFor(docPath), steps: steps.length };
     if (steps.length) checklists[slug] = { title, route: routeFor(docPath), steps };

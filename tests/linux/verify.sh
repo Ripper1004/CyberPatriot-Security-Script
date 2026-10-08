@@ -34,6 +34,7 @@ check "nullok removed"                           '! grep -E "^[^#]*pam_unix\.so.
 # sudo
 check "NOPASSWD removed"                         '! grep -rE "^[^#]*NOPASSWD" /etc/sudoers /etc/sudoers.d'
 check "sudo configuration is valid"              'visudo -c'
+check "bob's planted sudo rule disabled"          '! grep -rhE "^[[:space:]]*bob[[:space:]]" /etc/sudoers /etc/sudoers.d'
 # files / permissions
 check "find is no longer SUID"                   '[ ! -u /usr/bin/find ]'
 check "media files deleted"                      '[ ! -e /home/bob/Music/song.mp3 ] && [ ! -e /home/eve/Videos/movie.mp4 ]'

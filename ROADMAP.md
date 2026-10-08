@@ -230,6 +230,7 @@ So the checklists still read well on GitHub, and editing `docs/` updates the web
   - "Go to next step" and "Hide finished steps"
   - "Reset for a new image"
   - Print with tick boxes
+- **Script tags:** every checklist step says what the hardening script does for it (✅ done, 🔎 checks but you decide, ✋ by hand). Each checklist has a "Fast path: run the hardening script" step right after forensics. After an Apply run, **Tick the script's ✅ steps** ticks them all, so "Hide finished steps" and "Go to next step" skip straight to what's left.
 - **Learning path:** 7 lessons in order, with "Mark as read" and "Next lesson".
 - **Home page:**
   - "continue where you left off"

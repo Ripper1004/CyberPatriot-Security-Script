@@ -11,7 +11,7 @@ const lesson = cp?.lesson ? lessons[cp.lesson - 1] : undefined;
 ---
 
 <Default />
-{cp?.kind === 'checklist' && <ChecklistHeader id={cp.id} page={entry.id} total={cp.steps ?? 0} />}
+{cp?.kind === 'checklist' && <ChecklistHeader id={cp.id} page={entry.id} />}
 {
   lesson && (
     <p class="cp-lesson-chip">

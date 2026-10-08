@@ -87,7 +87,7 @@ site/
 
 ### Adding a checklist
 
-1. Write `docs/checklists/<name>.md` in the usual format. Every step is a `### N.N Title` heading followed by a `- [ ] Done` line.
+1. Write `docs/checklists/<name>.md` in the usual format. Every step is a `### N.N Title` heading followed by a `- [ ] Done` line, then a `**Script:** ✅/🔎/✋ ...` line saying what the hardening script does for that step (the build fails without it; a step titled "Fast path ..." is exempt).
 2. Add an entry to `CHECKLISTS` in `src/data/catalog.mjs` (and to `SEASON` if a round uses it).
 3. Add a sidebar badge in `astro.config.mjs` (optional).
 4. Run `npm test`.

@@ -89,6 +89,7 @@ See [ROADMAP.md](ROADMAP.md): what was wrong with the old scripts, the design of
 
 ## Contributing
 - Keep the checklist item format: **What · Why it matters · Clicking · Typing · Check it worked · Warning**.
+- Under each step's `- [ ] Done`, keep one `**Script:**` line saying what the hardening script does for it: `✅` it does it fully, `🔎` it checks but a person decides, `✋` by hand. The website build stops if a checklist step has none. Only use ✅ if Apply mode really finishes the step.
 - Write for someone who has never done this before. Short sentences, explain every acronym.
 - Website changes: `cd site && npm install && npm test` (builds the site and checks every link). See [site/README.md](site/README.md).
 - Script changes: add a planted problem to `tests/linux/plant-vulns.sh` and a check to `tests/linux/verify.sh`, then run the tests.

@@ -1488,8 +1488,12 @@ sec_sudoers() {
       problems+=("dangerous Defaults")
       stage_sed 's/^([[:space:]]*Defaults.*(LD_PRELOAD|LD_LIBRARY_PATH|!env_reset).*)$/# \1   # disabled by harden.sh/' "disable dangerous Defaults"
     fi
-    # User or group rules that are not the normal admin groups
-    while IFS= read -r line; do
+    # User or group rules that are not the normal admin groups. Read them from the
+    # staged copy, so the match below sees the line after the edits above
+    # (e.g. with NOPASSWD already removed).
+    local rules=()
+    mapfile -t rules < <(grep -Ev '^[[:space:]]*(#|$)' "$STAGE_TMP" | grep -E '^[[:space:]]*[%A-Za-z0-9_.-]+[[:space:]]+[^=]*=')
+    for line in "${rules[@]}"; do
       u=$(awk '{print $1}' <<<"$line")
       case $u in
         root|%sudo|%admin|%wheel|Defaults*|User_Alias|Runas_Alias|Host_Alias|Cmnd_Alias|@include*|\#include*) continue ;;
@@ -1501,7 +1505,7 @@ sec_sudoers() {
         local esc; esc=$(printf '%s' "$line" | sed 's/[][\.*^$/()+?{}|]/\\&/g')
         stage_sed "s/^${esc}\$/# & # disabled by harden.sh/" "disable rule for $u"
       fi
-    done < <(grep -Ev '^[[:space:]]*(#|$)' "$f" | grep -E '^[[:space:]]*[%A-Za-z0-9_.-]+[[:space:]]+[^=]*=')
+    done
     if [[ ${#problems[@]} -eq 0 ]]; then rm -f "$STAGE_TMP"; result OK "$f looks normal"; continue; fi
     stage_commit "Sudo rules in $f" visudo -c
   done

@@ -13,6 +13,8 @@ export interface Step {
   id: string;
   title: string;
   section: string;
+  /** What the hardening script does for this step (checklist steps only). */
+  script?: 'auto' | 'review' | 'manual';
 }
 
 export const pages = pagesJson as Record<string, PageInfo>;
