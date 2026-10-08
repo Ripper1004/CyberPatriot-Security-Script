@@ -1,0 +1,25 @@
+---
+// One of the UI line icons from src/data/icons.ts, in the current text colour.
+import { ICON_PATHS, type UiIconName } from '../data/icons';
+
+interface Props {
+  name: UiIconName;
+  class?: string;
+}
+const { name, class: className } = Astro.props;
+---
+
+<svg
+  class:list={['cp-icon', className]}
+  viewBox="0 0 24 24"
+  width="24"
+  height="24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.75"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+  focusable="false"
+  set:html={ICON_PATHS[name]}
+/>

@@ -1,15 +1,18 @@
 ---
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
-import { CATEGORIES, COMMANDS } from '../../data/commands';
+import { CATEGORIES, COMMANDS as BASE } from '../../data/commands';
+import { CISCO_COMMANDS } from '../../data/commands-cisco';
 
-const osLabel = { linux: 'Linux', windows: 'Windows', freebsd: 'FreeBSD' } as const;
-const shell = { linux: 'Terminal', windows: 'PowerShell (Admin)', freebsd: 'Terminal (root)' } as const;
+const COMMANDS = [...BASE, ...CISCO_COMMANDS];
+
+const osLabel = { linux: 'Linux', windows: 'Windows', freebsd: 'FreeBSD', cisco: 'Cisco IOS' } as const;
+const shell = { linux: 'Terminal', windows: 'PowerShell (Admin)', freebsd: 'Terminal (root)', cisco: 'IOS CLI' } as const;
 ---
 
 <StarlightPage
   frontmatter={{
     title: 'Command finder',
-    description: 'Search the most useful Linux, Windows and FreeBSD security commands by what you want to do.',
+    description: 'Search the most useful Linux, Windows, FreeBSD and Cisco IOS security commands by what you want to do.',
     editUrl: false,
     tableOfContents: false,
   }}
@@ -40,6 +43,7 @@ const shell = { linux: 'Terminal', windows: 'PowerShell (Admin)', freebsd: 'Term
         <button type="button" data-os="linux" aria-pressed="false">Linux</button>
         <button type="button" data-os="windows" aria-pressed="false">Windows</button>
         <button type="button" data-os="freebsd" aria-pressed="false">FreeBSD</button>
+        <button type="button" data-os="cisco" aria-pressed="false">Cisco</button>
       </div>
     </div>
     <div class="cf__cats" role="group" aria-label="Category" data-cf-cats>
@@ -202,7 +206,7 @@ const shell = { linux: 'Terminal', windows: 'PowerShell (Admin)', freebsd: 'Term
   .cf__search .cp-input {
     min-height: 3rem;
     padding-inline: 2.6rem 2.5rem;
-    border-radius: 999px;
+    border-radius: var(--cp-radius-sm);
     font-size: var(--sl-text-base);
   }
   .cf__kbd {
@@ -224,7 +228,7 @@ const shell = { linux: 'Terminal', windows: 'PowerShell (Admin)', freebsd: 'Term
   .cf__cat {
     padding: 0.3rem 0.75rem;
     border: 1px solid var(--cp-border);
-    border-radius: 999px;
+    border-radius: var(--cp-radius-sm);
     background: transparent;
     color: var(--sl-color-gray-2);
     font: inherit;
@@ -281,7 +285,7 @@ const shell = { linux: 'Terminal', windows: 'PowerShell (Admin)', freebsd: 'Term
   }
   .cf__os {
     padding: 0.1rem 0.55rem;
-    border-radius: 999px;
+    border-radius: var(--cp-radius-xs);
     font-size: var(--sl-text-xs);
     font-weight: 700;
   }
@@ -292,6 +296,10 @@ const shell = { linux: 'Terminal', windows: 'PowerShell (Admin)', freebsd: 'Term
   .cf__os--windows {
     background: color-mix(in srgb, var(--cp-os-windows) 18%, transparent);
     color: var(--cp-os-windows);
+  }
+  .cf__os--cisco {
+    background: color-mix(in srgb, #0ea5e9 18%, transparent);
+    color: #0ea5e9;
   }
   .cf__os--freebsd {
     background: color-mix(in srgb, var(--cp-os-freebsd) 18%, transparent);

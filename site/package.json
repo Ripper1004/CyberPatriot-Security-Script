@@ -20,6 +20,7 @@
     "@astrojs/starlight": "0.42.4",
     "@fontsource-variable/inter": "5.3.0",
     "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fontsource-variable/space-grotesk": "5.3.0",
     "astro": "7.3.5",
     "github-slugger": "2.0.0",
     "starlight-links-validator": "0.26.0"

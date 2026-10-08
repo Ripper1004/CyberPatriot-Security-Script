@@ -34,6 +34,7 @@ export default defineConfig({
       customCss: [
         '@fontsource-variable/inter',
         '@fontsource-variable/jetbrains-mono',
+        '@fontsource-variable/space-grotesk',
         './src/styles/theme.css',
         './src/styles/site.css',
         './src/styles/print.css',
@@ -78,7 +79,10 @@ export default defineConfig({
           items: [
             { label: 'README config builder', link: '/tools/config-builder/' },
             { label: 'Round timer', link: '/tools/round-timer/' },
+            { label: 'Findings to-do list', link: '/tools/findings/' },
+            { label: 'Round log', link: '/tools/round-log/' },
             { label: 'Command finder', link: '/tools/commands/' },
+            { label: 'Forensics helper', link: '/tools/forensics/' },
             { label: 'Download the scripts', link: '/downloads/' },
           ],
         },
@@ -87,6 +91,7 @@ export default defineConfig({
           items: [
             { label: 'Forensics questions', link: '/guides/forensics-questions/' },
             { label: 'Linux service hardening', link: '/guides/linux-service-hardening/' },
+            { label: 'Cisco & Packet Tracer', link: '/guides/cisco-networking/' },
           ],
         },
         {
@@ -104,6 +109,7 @@ export default defineConfig({
           items: [
             { label: 'Glossary', link: '/guides/glossary/' },
             { label: 'Glossary quiz', link: '/tools/glossary-quiz/' },
+            { label: 'Networking quiz', link: '/tools/networking-quiz/' },
             { label: 'For mentors & teachers', link: '/guides/for-mentors-and-teachers/' },
             { label: 'About this site', link: '/about/' },
           ],

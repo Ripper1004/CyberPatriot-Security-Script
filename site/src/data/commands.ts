@@ -1,8 +1,9 @@
 // Command reference for the Command finder tool.
-// os: linux = Mint / Debian / Ubuntu, windows = PowerShell (as Administrator), freebsd.
+// os: linux = Mint / Debian / Ubuntu, windows = PowerShell (as Administrator), freebsd,
+// cisco = Cisco IOS (Packet Tracer). The Cisco list lives in commands-cisco.ts.
 // `risk` marks commands that change things: double-check before running.
 
-export type CommandOS = 'linux' | 'windows' | 'freebsd';
+export type CommandOS = 'linux' | 'windows' | 'freebsd' | 'cisco';
 export interface Command {
   os: CommandOS;
   cat: string;

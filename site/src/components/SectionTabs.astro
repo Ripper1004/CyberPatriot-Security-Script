@@ -28,16 +28,17 @@ const tabs = [
     gap: 0.25rem;
     padding: 0.2rem;
     border: 1px solid var(--cp-border);
-    border-radius: 0.7rem;
-    background: var(--sl-color-black);
+    border-radius: calc(var(--cp-radius-sm) + 0.2rem);
+    background: var(--cp-well);
   }
   .cp-tabs__tab {
     display: grid;
     flex: 1;
     gap: 0.05rem;
     padding: 0.3rem 0.85rem;
-    border-radius: 0.5rem;
-    color: var(--sl-color-gray-2);
+    border: 1px solid transparent;
+    border-radius: var(--cp-radius-sm);
+    color: var(--sl-color-gray-3);
     font-size: var(--sl-text-sm);
     font-weight: 650;
     text-align: center;
@@ -48,8 +49,10 @@ const tabs = [
     color: var(--sl-color-white);
   }
   .cp-tabs__tab[aria-current='true'] {
-    background: var(--sl-color-accent);
-    color: var(--sl-color-black);
+    border-color: var(--cp-border);
+    background: var(--cp-raised);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+    color: var(--sl-color-white);
   }
   .cp-tabs__hint {
     font-size: 0.68rem;

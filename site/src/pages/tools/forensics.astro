@@ -1,0 +1,426 @@
+---
+// Forensics helper: hash a file, identify a file type, and decode text
+// (Base64, hex, URL, ROT13, binary, Caesar). Everything runs in the browser.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Forensics helper',
+    description: 'Hash a file (MD5, SHA-1, SHA-256), identify a file type, and decode Base64, hex, URL, ROT13, binary and Caesar text.',
+    editUrl: false,
+    tableOfContents: false,
+  }}
+>
+  <div class="fx cp-wide not-content" data-fx>
+    <p class="fx__intro">
+      Quick answers for common forensics questions. Nothing leaves your computer. For the command-line way, see the{' '}
+      <a href="/guides/forensics-questions/">forensics questions guide</a>.
+    </p>
+
+    <div class="cp-segmented" role="group" aria-label="Tool" data-fx-tabs>
+      <button type="button" data-tab="file" aria-pressed="true">Hash a file</button>
+      <button type="button" data-tab="text" aria-pressed="false">Decode text</button>
+    </div>
+
+    <!-- File -->
+    <section class="fx__panel" data-fx-panel="file">
+      <label class="fx__drop" data-fx-drop>
+        <input type="file" class="cp-visually-hidden" data-fx-file />
+        <span class="fx__drop-title">Drop a file here, or click to choose one</span>
+        <span class="fx__drop-hint">Any size. The file is read in your browser only.</span>
+      </label>
+      <div class="fx__result" data-fx-file-result hidden>
+        <dl class="fx__meta">
+          <div><dt>File</dt><dd data-fx-name></dd></div>
+          <div><dt>Size</dt><dd data-fx-size></dd></div>
+          <div><dt>Looks like</dt><dd data-fx-type></dd></div>
+        </dl>
+        <div class="fx__hashes" data-fx-hashes></div>
+        <label class="cp-field fx__compare">
+          <span class="cp-label">Compare with a hash (paste it here)</span>
+          <input class="cp-input" type="text" spellcheck="false" placeholder="e.g. 5d41402abc4b2a76b9719d911017c592" data-fx-compare />
+          <span class="fx__match" data-fx-match></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Text -->
+    <section class="fx__panel" data-fx-panel="text" hidden>
+      <label class="cp-field">
+        <span class="cp-label">Text to decode</span>
+        <textarea class="cp-textarea" rows="4" spellcheck="false" placeholder="Paste the encoded text from the forensics question" data-fx-text></textarea>
+        <span class="cp-hint" data-fx-guess></span>
+      </label>
+      <div class="fx__outs" data-fx-outs></div>
+      <details class="fx__caesar">
+        <summary>Caesar cipher: all 25 shifts</summary>
+        <ol data-fx-caesar></ol>
+      </details>
+    </section>
+  </div>
+</StarlightPage>
+
+<script>
+  import { md5 } from '../../scripts/md5';
+
+  const root = document.querySelector<HTMLElement>('[data-fx]')!;
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+  const hex = (buf: ArrayBuffer | Uint8Array) =>
+    [...new Uint8Array(buf instanceof Uint8Array ? buf : new Uint8Array(buf))].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+  // ---- tabs
+  $('[data-fx-tabs]').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-tab]');
+    if (!b) return;
+    root.querySelectorAll<HTMLButtonElement>('[data-fx-tabs] button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    root.querySelectorAll<HTMLElement>('[data-fx-panel]').forEach((p) => (p.hidden = p.dataset.fxPanel !== b.dataset.tab));
+  });
+
+  // ---- file type by "magic bytes"
+  const MAGIC: [string, string][] = [
+    ['89504e47', 'PNG image'],
+    ['ffd8ff', 'JPEG image'],
+    ['47494638', 'GIF image'],
+    ['25504446', 'PDF document'],
+    ['504b0304', 'ZIP archive (also .docx, .xlsx, .pptx, .jar, .apk)'],
+    ['1f8b', 'GZIP archive (.gz, .tar.gz)'],
+    ['425a68', 'BZIP2 archive'],
+    ['377abcaf271c', '7-Zip archive'],
+    ['526172211a07', 'RAR archive'],
+    ['7f454c46', 'Linux program (ELF)'],
+    ['4d5a', 'Windows program (EXE / DLL)'],
+    ['cafebabe', 'Java class or macOS universal binary'],
+    ['494433', 'MP3 audio (ID3 tag)'],
+    ['fffb', 'MP3 audio'],
+    ['4f676753', 'OGG audio/video'],
+    ['664c6143', 'FLAC audio'],
+    ['d0cf11e0a1b11ae1', 'Old Microsoft Office document (.doc, .xls, .ppt)'],
+    ['d4c3b2a1', 'Packet capture (.pcap)'],
+    ['a1b2c3d4', 'Packet capture (.pcap)'],
+    ['0a0d0d0a', 'Packet capture (.pcapng)'],
+    ['53514c69746520666f726d6174203300', 'SQLite database'],
+    ['2321', 'Script (starts with #!)'],
+  ];
+  function fileType(head: Uint8Array): string {
+    const h = hex(head.slice(0, 16));
+    if (h.startsWith('52494646')) {
+      const sub = new TextDecoder().decode(head.slice(8, 12));
+      return sub === 'WAVE' ? 'WAV audio' : sub === 'AVI ' ? 'AVI video' : sub === 'WEBP' ? 'WEBP image' : 'RIFF media file';
+    }
+    if (h.slice(8, 16) === '66747970') return 'MP4 / MOV video (or M4A audio)';
+    if (h.startsWith('1a45dfa3')) return 'Matroska video (.mkv / .webm)';
+    const hit = MAGIC.find(([m]) => h.startsWith(m));
+    if (hit) return hit[1];
+    const sample = head.slice(0, 512);
+    const printable = sample.every((b) => b === 9 || b === 10 || b === 13 || (b >= 32 && b < 127) || b >= 128);
+    return printable ? 'Text file' : 'Unknown binary data';
+  }
+
+  const fmtSize = (n: number) =>
+    n < 1024 ? `${n} bytes` : n < 1024 ** 2 ? `${(n / 1024).toFixed(1)} KB (${n.toLocaleString()} bytes)` : `${(n / 1024 ** 2).toFixed(1)} MB (${n.toLocaleString()} bytes)`;
+
+  let hashes: Record<string, string> = {};
+
+  async function hashFile(file: File) {
+    const data = new Uint8Array(await file.arrayBuffer());
+    $('[data-fx-name]').textContent = file.name;
+    $('[data-fx-size]').textContent = fmtSize(file.size);
+    $('[data-fx-type]').textContent = fileType(data);
+    hashes = {
+      MD5: md5(data),
+      'SHA-1': hex(await crypto.subtle.digest('SHA-1', data)),
+      'SHA-256': hex(await crypto.subtle.digest('SHA-256', data)),
+      'SHA-512': hex(await crypto.subtle.digest('SHA-512', data)),
+    };
+    $('[data-fx-hashes]').innerHTML = Object.entries(hashes)
+      .map(
+        ([k, v]) => `<div class="fx__hash" data-algo="${k}"><span>${k}</span><code>${v}</code>
+          <button type="button" class="cp-btn cp-btn--sm" data-copy="${v}">Copy</button></div>`,
+      )
+      .join('');
+    $('[data-fx-file-result]').hidden = false;
+    compare();
+  }
+
+  function compare() {
+    const want = $<HTMLInputElement>('[data-fx-compare]').value.trim().toLowerCase().replace(/\s+/g, '');
+    const out = $('[data-fx-match]');
+    root.querySelectorAll('.fx__hash').forEach((el) => el.classList.remove('is-match'));
+    if (!want) {
+      out.textContent = '';
+      return;
+    }
+    const hit = Object.entries(hashes).find(([, v]) => v === want);
+    if (hit) root.querySelector(`.fx__hash[data-algo="${hit[0]}"]`)?.classList.add('is-match');
+    out.textContent = hit ? `✓ Matches the ${hit[0]} hash` : '✗ No match. Check you copied the whole hash and picked the right file.';
+    out.className = `fx__match ${hit ? 'is-ok' : 'is-bad'}`;
+  }
+
+  const fileInput = $<HTMLInputElement>('[data-fx-file]');
+  fileInput.addEventListener('change', () => fileInput.files?.[0] && hashFile(fileInput.files[0]));
+  const drop = $('[data-fx-drop]');
+  drop.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    drop.classList.add('is-over');
+  });
+  drop.addEventListener('dragleave', () => drop.classList.remove('is-over'));
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    drop.classList.remove('is-over');
+    const f = e.dataTransfer?.files?.[0];
+    if (f) hashFile(f);
+  });
+  $('[data-fx-compare]').addEventListener('input', compare);
+
+  // ---- text decoders
+  const utf8 = new TextDecoder('utf-8', { fatal: true });
+  const show = (bytes: Uint8Array) => {
+    try {
+      const s = utf8.decode(bytes);
+      return /[\x00-\x08\x0e-\x1f]/.test(s) ? `(binary data) ${hex(bytes)}` : s;
+    } catch {
+      return `(binary data) ${hex(bytes)}`;
+    }
+  };
+  const rot = (s: string, n: number) =>
+    s.replace(/[a-z]/gi, (c) => {
+      const base = c <= 'Z' ? 65 : 97;
+      return String.fromCharCode(((c.charCodeAt(0) - base + n) % 26) + base);
+    });
+
+  type Decoder = { name: string; run: (s: string) => string | null };
+  const DECODERS: Decoder[] = [
+    {
+      name: 'Base64 → text',
+      run: (s) => {
+        const t = s.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(t) || t.length < 4) return null;
+        const bin = atob(t.padEnd(Math.ceil(t.length / 4) * 4, '='));
+        return show(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+      },
+    },
+    {
+      name: 'Hex → text',
+      run: (s) => {
+        const t = s.replace(/0x|\\x|[\s:,-]/gi, '');
+        if (!/^[0-9a-f]+$/i.test(t) || t.length % 2) return null;
+        return show(Uint8Array.from(t.match(/../g)!, (h) => parseInt(h, 16)));
+      },
+    },
+    {
+      name: 'Binary → text',
+      run: (s) => {
+        const t = s.replace(/\s+/g, '');
+        if (!/^[01]+$/.test(t) || t.length % 8) return null;
+        return show(Uint8Array.from(t.match(/.{8}/g)!, (b) => parseInt(b, 2)));
+      },
+    },
+    {
+      name: 'URL decode',
+      run: (s) => {
+        if (!/%[0-9a-f]{2}|\+/i.test(s)) return null;
+        try {
+          return decodeURIComponent(s.replace(/\+/g, ' '));
+        } catch {
+          return null;
+        }
+      },
+    },
+    { name: 'ROT13', run: (s) => (/[a-z]/i.test(s) ? rot(s, 13) : null) },
+    { name: 'Reversed', run: (s) => [...s].reverse().join('') },
+    {
+      name: 'Text → Base64',
+      run: (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s))),
+    },
+  ];
+
+  async function decode() {
+    const s = $<HTMLTextAreaElement>('[data-fx-text]').value;
+    const outs = $('[data-fx-outs]');
+    if (!s.trim()) {
+      outs.innerHTML = '';
+      $('[data-fx-guess]').textContent = '';
+      $('[data-fx-caesar]').innerHTML = '';
+      return;
+    }
+    const results = DECODERS.map((d) => {
+      let r: string | null = null;
+      try {
+        r = d.run(s.trim());
+      } catch {
+        r = null;
+      }
+      return { name: d.name, r };
+    });
+    const bytes = new TextEncoder().encode(s.trim());
+    const textHashes = {
+      'MD5 of the text': md5(bytes),
+      'SHA-256 of the text': hex(await crypto.subtle.digest('SHA-256', bytes)),
+    };
+    // A decoder "fits" only if it produces readable text.
+    const firstHit = results.find(
+      (x) => x.r !== null && /→ text|URL/.test(x.name) && !x.r.startsWith('(binary data)') && x.r.trim() !== '',
+    );
+    $('[data-fx-guess]').textContent = firstHit ? `This looks like ${firstHit.name.split(' ')[0]}.` : 'Not Base64, hex, binary or URL encoded. Try ROT13 or the Caesar shifts below.';
+    outs.innerHTML = [...results.map((x) => [x.name, x.r] as const), ...Object.entries(textHashes)]
+      .map(
+        ([name, r]) => `<div class="fx__out ${r === null ? 'is-na' : ''} ${firstHit && firstHit.name === name ? 'is-best' : ''}">
+          <span class="fx__out-name">${name}</span>
+          ${r === null ? '<span class="fx__na">not this format</span>' : `<code>${esc(r)}</code><button type="button" class="cp-btn cp-btn--sm" data-copy="${esc(r)}">Copy</button>`}
+        </div>`,
+      )
+      .join('');
+    $('[data-fx-caesar]').innerHTML = /[a-z]/i.test(s)
+      ? Array.from({ length: 25 }, (_, i) => `<li><span>Shift ${i + 1}</span> <code>${esc(rot(s.trim(), i + 1))}</code></li>`).join('')
+      : '';
+  }
+  $('[data-fx-text]').addEventListener('input', decode);
+
+  root.addEventListener('click', async (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-copy]');
+    if (!b) return;
+    try {
+      await navigator.clipboard.writeText(b.dataset.copy as string);
+      b.textContent = 'Copied ✓';
+      setTimeout(() => (b.textContent = 'Copy'), 1500);
+    } catch {
+      window.prompt('Copy this:', b.dataset.copy);
+    }
+  });
+</script>
+
+<style>
+  .fx {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.1rem;
+  }
+  .fx__intro {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+  }
+  .fx > .cp-segmented {
+    justify-self: start;
+  }
+  .fx__panel {
+    display: grid;
+    gap: 1rem;
+  }
+  .fx__drop {
+    display: grid;
+    place-items: center;
+    gap: 0.3rem;
+    padding: 2.5rem 1rem;
+    border: 2px dashed var(--cp-border);
+    border-radius: var(--cp-radius);
+    background: var(--cp-card);
+    text-align: center;
+    cursor: pointer;
+  }
+  .fx__drop:hover,
+  .fx__drop.is-over {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+  }
+  .fx__drop-title {
+    color: var(--sl-color-white);
+    font-weight: 700;
+  }
+  .fx__drop-hint {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .fx__result {
+    display: grid;
+    gap: 0.9rem;
+  }
+  .fx__meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.5rem 1.5rem;
+    margin: 0;
+  }
+  .fx__meta dt {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .fx__meta dd {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .fx__hashes,
+  .fx__outs {
+    display: grid;
+    gap: 0.4rem;
+  }
+  .fx :global(.fx__hash),
+  .fx :global(.fx__out) {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.45rem 0.45rem 0.45rem 0.8rem;
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-sm);
+    background: var(--sl-color-black);
+  }
+  .fx :global(.fx__hash.is-match),
+  .fx :global(.fx__out.is-best) {
+    border-color: var(--cp-success);
+  }
+  .fx :global(.fx__hash span),
+  .fx :global(.fx__out-name) {
+    flex: none;
+    width: 8.5rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+  }
+  .fx :global(.fx__hash code),
+  .fx :global(.fx__out code) {
+    flex: 1;
+    min-width: 0;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-xs);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .fx :global(.fx__out.is-na) {
+    opacity: 0.55;
+  }
+  .fx :global(.fx__na) {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+  .fx__match {
+    font-size: var(--sl-text-sm);
+    font-weight: 700;
+  }
+  .fx__match.is-ok {
+    color: var(--cp-success);
+  }
+  .fx__match.is-bad {
+    color: var(--cp-danger);
+  }
+  .fx__caesar summary {
+    color: var(--sl-color-accent);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .fx__caesar ol {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--sl-text-xs);
+  }
+  .fx__caesar :global(li span) {
+    display: inline-block;
+    width: 4.5rem;
+    color: var(--sl-color-gray-3);
+  }
+</style>
