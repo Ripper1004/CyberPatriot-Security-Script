@@ -103,7 +103,7 @@ python3 tests/checklists/linux_lab.py linux-mint                # needs Docker
 ---
 
 ## Plans
-See [ROADMAP.md](ROADMAP.md): what was wrong with the old scripts, the design of the new ones, and how the website works.
+See [ROADMAP.md](ROADMAP.md): current status, how the scripts, checklists and website are designed, and what is left to do.
 
 ## Contributing
 - Keep the checklist item format: **What · Why it matters · Clicking · Typing · Check it worked · Warning**.
