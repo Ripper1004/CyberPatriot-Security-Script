@@ -39,7 +39,8 @@ IMAGES = {
 }
 
 SKIP = [
-    (r'\b(nano|vim?|visudo|less|more|top|htop|watch|tail -f)\b(?!\.)', 'interactive'),
+    # an interactive program in command position (start of line, after sudo or a pipe), not a word in a grep pattern
+    (r'(?:^|[;&|]\s*|\bsudo\s+)(?:nano|vim?|visudo|less|more|top|htop|watch)\b(?![-.])|\btail\s+-f\b', 'interactive'),
     (r'\b(reboot|shutdown|halt|poweroff|init [06])\b', 'reboots the machine'),
     (r'^\s*(sudo\s+)?(su|passwd\s+\w+|adduser\s+\w+|sudo -i|sudo su)\s*(#.*)?$', 'interactive'),
     (r'apt(-get)?\s+(full-)?(dist-)?upgrade|do-release-upgrade|apt(-get)?\s+update', 'slow, needs network'),
