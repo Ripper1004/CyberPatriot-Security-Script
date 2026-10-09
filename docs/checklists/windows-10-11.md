@@ -371,12 +371,17 @@ Accounts show as SIDs: `*S-1-1-0` = Everyone, `*S-1-5-32-545` = Users, `*S-1-5-3
 | User Account Control: Run all administrators in Admin Approval Mode | **Enabled** |
 | User Account Control: Switch to the secure desktop when prompting for elevation | **Enabled** |
 | User Account Control: Virtualize file and registry write failures to per-user locations | **Enabled** |
+| Network security: Minimum session security for NTLM SSP based (including secure RPC) clients | **Require NTLMv2 session security** and **Require 128-bit encryption** (tick both) |
+| Network security: Minimum session security for NTLM SSP based (including secure RPC) servers | **Require NTLMv2 session security** and **Require 128-bit encryption** (tick both) |
 
 **Check it worked (a few of them):**
 ```powershell
 Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\Lsa | Format-List LimitBlankPasswordUse, RestrictAnonymous, RestrictAnonymousSAM, NoLMHash, LmCompatibilityLevel
 ```
 Wanted: `1`, `1`, `1`, `1`, `5`. A blank means the setting was never changed from the Windows default: set it in `secpol.msc`.
+```powershell
+Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0 | Format-List NTLMMinClientSec, NTLMMinServerSec   # both 537395200 = the two NTLM rows ticked
+```
 
 ### 4.4 PowerShell logging
 - [ ] Done
@@ -460,15 +465,17 @@ Get-MpThreatDetection           # anything found
 ### 6.1 Firewall on for every network type
 - [ ] Done
 
-**Script:** ✅ Done by the script (`firewall` section).
+**Script:** 🔎 The script turns the firewall on and blocks incoming connections for every profile, but if outgoing connections are set to **Block** it only reports it (with the fix command); check that column yourself.
 
 **Clicking:** **Windows Security → Firewall & network protection**. **Domain**, **Private** and **Public** must all say *Firewall is on*.
 
 **Typing:**
 ```powershell
 Set-NetFirewallProfile -Profile Domain,Private,Public -Enabled True -DefaultInboundAction Block -DefaultOutboundAction Allow
-Get-NetFirewallProfile | Format-Table Name, Enabled, DefaultInboundAction
+Get-NetFirewallProfile | Format-Table Name, Enabled, DefaultInboundAction, DefaultOutboundAction
 ```
+
+**Check it worked:** every profile shows `Enabled True`, `DefaultInboundAction Block`, and `DefaultOutboundAction` **Allow** or **NotConfigured**. **Block** there stops updates and can stop the Scoring Report updating; set it back with the first command unless the README asks for it.
 
 ### 6.2 Check the inbound rules
 - [ ] Done
@@ -566,11 +573,36 @@ Set-Service -Name RemoteRegistry -StartupType Disabled
 
 **Script:** ✅ Done by the script (`services` section).
 
-Windows Defender (`WinDefend`), Windows Defender Firewall (`mpssvc`), Windows Event Log (`EventLog`), Windows Update (`wuauserv`, Manual is fine), Security Center (`wscsvc`). None of these may be **Disabled**.
+Windows Defender (`WinDefend`), Windows Defender Firewall (`mpssvc`), Windows Event Log (`EventLog`), Windows Update (`wuauserv`, Manual is fine), Security Center (`wscsvc`, not on Windows Server). None of these may be **Disabled**.
 
 ```powershell
-Get-Service WinDefend, mpssvc, EventLog, wuauserv, wscsvc | Format-Table Name, Status, StartType
+Get-Service WinDefend, mpssvc, EventLog, wuauserv, wscsvc -ErrorAction SilentlyContinue | Format-Table Name, Status, StartType   # on Windows Server, wscsvc is simply missing from the list
 ```
+
+### 8.3 Printer drivers: PrintNightmare fixes
+- [ ] Done
+
+**Script:** ✅ Done by the script (`security` section).
+
+**What:** Only administrators may install printer drivers, and "Point and Print" must always show a warning and ask for an admin password.
+**Why it matters:** PrintNightmare (CVE-2021-34527) lets a normal user install a "printer driver" that runs as SYSTEM, the most powerful account. An image can plant the old, unsafe setting even when Windows is updated.
+
+**Clicking:** `gpedit.msc` → **Computer Configuration → Administrative Templates → Printers**:
+- **Limits print driver installation to Administrators**: **Enabled** (only on images updated since October 2021; skip it if it isn't in the list).
+- **Point and Print Restrictions**: **Enabled**, and both "When installing drivers for a new connection" and "When updating drivers for an existing connection" set to **Show warning and elevation prompt**.
+
+On Home, or if the first policy isn't in the list, use the Typing commands.
+
+**Typing:**
+```powershell
+$pp = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers\PointAndPrint'
+if (-not (Test-Path $pp)) { New-Item -Path $pp -Force | Out-Null }
+New-ItemProperty -Path $pp -Name RestrictDriverInstallationToAdministrators -Value 1 -PropertyType DWord -Force
+New-ItemProperty -Path $pp -Name NoWarningNoElevationOnInstall -Value 0 -PropertyType DWord -Force
+New-ItemProperty -Path $pp -Name UpdatePromptSettings -Value 0 -PropertyType DWord -Force
+```
+
+**Check it worked:** `Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers\PointAndPrint'` shows `RestrictDriverInstallationToAdministrators : 1` and the other two `0`. If the README doesn't need printing, also turn off the Print Spooler (8.1).
 
 ---
 
@@ -637,7 +669,7 @@ Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Remote Assistance' | Se
 ### 10.2 Remote Desktop off (or secured)
 - [ ] Done
 
-**Script:** 🔎 The script keeps Remote Desktop on with NLA if your config lists rdp, otherwise turns it off (asks first); still check who is in Remote Desktop Users.
+**Script:** 🔎 The script keeps Remote Desktop on with NLA if your config lists rdp, otherwise turns it off (asks first), and reports a Group Policy that overrides this; still check who is in Remote Desktop Users.
 
 > [!CAUTION]
 > If the README lists Remote Desktop as a critical service, **don't turn it off**: you lose points for breaking it.
@@ -645,7 +677,9 @@ Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Remote Assistance' | Se
 **Check:**
 ```powershell
 Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server' | Select-Object fDenyTSConnections   # 1 = off, 0 = on
+Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services' -ErrorAction SilentlyContinue | Select-Object fDenyTSConnections, UserAuthentication
 ```
+The second line shows Group Policy values. If they are there, they **win** over the first line and over the Settings switch: fix them in `gpedit.msc` → **Computer Configuration → Administrative Templates → Windows Components → Remote Desktop Services → Remote Desktop Session Host → Connections → Allow users to connect remotely by using Remote Desktop Services** (and **Security → Require user authentication for remote connections by using Network Level Authentication**).
 
 **Not needed:** **Settings → System → Remote Desktop → Off**, or:
 ```powershell
@@ -924,27 +958,28 @@ Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=TRUE" | Sel
 
 **Script:** ✅ Done by the script (`browsers` section).
 
-**⋯ → Settings → Privacy, search, and services** → **Microsoft Defender SmartScreen: On**, **Block potentially unwanted apps: On**. **Cookies and site permissions → Pop-ups and redirects → Block**. Update via **⋯ → Help and feedback → About Microsoft Edge**.
+**⋯ → Settings → Privacy, search, and services** → **Microsoft Defender SmartScreen: On**, **Block potentially unwanted apps: On**. **Cookies and site permissions → Pop-ups and redirects → Block**. **⋯ → Settings → Profiles → Passwords → Offer to save passwords: Off**. Update via **⋯ → Help and feedback → About Microsoft Edge**.
 
 ### 16.2 Firefox (if installed)
 - [ ] Done
 
-**Script:** 🔎 The script sets pop-up blocking, no add-on installs, HTTPS-Only and safe browsing by policy; still update Firefox, check the add-ons and tick any remaining boxes.
+**Script:** 🔎 The script sets pop-up blocking, no add-on installs, HTTPS-Only, safe browsing and no saved passwords by policy; still update Firefox, check the add-ons and tick any remaining boxes.
 
 **≡ → Settings → Privacy & Security**:
 - **Block pop-up windows** ✔
 - **Warn you when websites try to install add-ons** ✔
 - **Block dangerous and deceptive content** ✔ (all three boxes)
 - **HTTPS-Only Mode** → Enable in all windows
+- **Passwords → Ask to save passwords** ✘ (untick it)
 
 Then **≡ → Help → About Firefox** to update. Also check **Add-ons and themes** for extensions you don't recognise.
 
 ### 16.3 Chrome (if installed)
 - [ ] Done
 
-**Script:** 🔎 The script turns on Safe Browsing and pop-up blocking by policy; update Chrome yourself (Help → About Google Chrome).
+**Script:** 🔎 The script turns on Safe Browsing and pop-up blocking and turns off saving passwords by policy; update Chrome yourself (Help → About Google Chrome).
 
-**⋮ → Settings → Privacy and security → Security → Standard (or Enhanced) protection**. **Site settings → Pop-ups and redirects → Don't allow**. Update via **Help → About Google Chrome**.
+**⋮ → Settings → Privacy and security → Security → Standard (or Enhanced) protection**. **Site settings → Pop-ups and redirects → Don't allow**. **Autofill and passwords → Google Password Manager → Settings → Offer to save passwords: Off**. Update via **Help → About Google Chrome**.
 
 ---
 

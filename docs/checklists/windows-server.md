@@ -249,7 +249,7 @@ Get-GPOReport -All -ReportType Html -Path C:\gpo-report.html; Start-Process C:\g
 ### 4.4 Domain Controller: Zerologon protection
 - [ ] Done
 
-**Script:** ✋ Not done by the script. Do this by hand.
+**Script:** 🔎 On a Domain Controller the script sets `FullSecureChannelProtection` to 1 (`security` section); check the "Allow vulnerable Netlogon secure channel connections" policy yourself.
 
 **Why it matters:** Zerologon (CVE-2020-1472) lets anyone on the network take over a Domain Controller without a password. Windows updates since February 2021 always block it, but a planted policy can let chosen accounts use the weak connection again, and an un-updated image is wide open.
 
@@ -336,7 +336,7 @@ All should be **Running** and **Automatic**.
 ### 6.3 Print Spooler: PrintNightmare fixes
 - [ ] Done
 
-**Script:** ✋ Not done by the script (it only disables the Print Spooler in 6.1 when the README doesn't need printing). Do this by hand.
+**Script:** ✅ Done by the script (`security` section sets the three registry values below; the `services` section offers to turn off the Print Spooler when the README doesn't need printing).
 
 **Why it matters:** PrintNightmare (CVE-2021-34527) lets a normal user install a "printer driver" that runs as SYSTEM. If the spooler must keep running, make sure only admins can install drivers.
 
