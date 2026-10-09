@@ -48,5 +48,3 @@ export const lessons = LEARNING_PATH.map((l, i) => {
   if (!page) throw new Error(`Learning path page missing: ${l.path}`);
   return { n: i + 1, slug, id: slug.split('/').pop() as string, label: l.label, minutes: l.minutes, ...page };
 });
-
-export const totalSteps = CHECKLISTS.reduce((n, c) => n + (pages[`checklists/${c.id}`]?.steps ?? 0), 0);

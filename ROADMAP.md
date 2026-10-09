@@ -1,12 +1,26 @@
-# Roadmap: rebuilding the CyberPatriot practice toolkit
+# Roadmap
 
-This is the plan for turning this repo into a complete, beginner-friendly practice toolkit for the IT class. It covers what was wrong with the old material, what this season's images are, how the new scripts work, how the checklists are written, and how the website will work.
+Where the CyberPatriot Toolkit stands, how it's designed, and what's left. For how to *use* it, see the [README](README.md) or the website, **https://cp-toolkit.pages.dev/**.
 
 ---
 
-## 1. Which operating systems to cover
+## 1. Status
 
-**CyberPatriot 19 (2026–27) official image lineup** (from uscyberpatriot.org → Challenges and Scoring Values):
+The toolkit is **feature complete** for class use. What's left is mostly testing on real images and yearly upkeep (section 6).
+
+| Part | State |
+|---|---|
+| Checklists (6 OSes) | Done. Linux ones run command by command in containers; Windows and FreeBSD ones syntax-checked only. |
+| Linux script | Done. Tested on Debian 12, Ubuntu 22.04, Ubuntu 24.04 and Linux Mint 21.3. |
+| Windows script | Done. Logic-tested only: **never run on a real Windows image.** |
+| FreeBSD script | Done. Logic-tested only: **never run on a real FreeBSD system.** |
+| Website | Live on Cloudflare Pages, behind a Cloudflare Access login (`@lposd.org` emails, one-time PIN). Script downloads under `/files/` stay open so images can fetch them from a terminal. |
+
+---
+
+## 2. Which operating systems are covered
+
+**CyberPatriot 19 (2026–27) image lineup:**
 
 | Round | Dates | Images |
 |---|---|---|
@@ -16,281 +30,96 @@ This is the plan for turning this repo into a complete, beginner-friendly practi
 | State Round | Dec 10–13, 2026 | Windows Server 2022, Linux Mint 21, Debian 12 |
 | Semifinals | Jan 21–23, 2027 | Linux Mint 21, Windows Server 2022, Debian 12 / FreeBSD (by tier) |
 
-**This season is Windows 11, Windows Server 2022, Linux Mint 21, Debian 12 and FreeBSD.** Ubuntu and Windows 10 are not in the lineup this year.
+The class practices on **older images** too (Windows 10, Server 2019, Ubuntu), so the toolkit covers both:
 
-The class practices on **older images**, which are very likely to include Windows 10, Server 2019 and Ubuntu 20/22. So the toolkit covers both:
-
-| OS family | Versions covered | Script | Checklist |
+| OS family | Versions | Script | Checklist |
 |---|---|---|---|
 | Windows desktop | 10, 11 | `scripts/windows/Harden.ps1` | `docs/checklists/windows-10-11.md` |
-| Windows Server | 2016, 2019, 2022 (incl. Domain Controllers) | `scripts/windows/Harden.ps1` (same script, detects Server/DC) | `docs/checklists/windows-server.md` |
+| Windows Server | 2016, 2019, 2022 (incl. Domain Controllers) | `scripts/windows/Harden.ps1` (detects Server/DC) | `docs/checklists/windows-server.md` |
 | Linux Mint | 20, 21, 22 | `scripts/linux/harden.sh` | `docs/checklists/linux-mint.md` |
-| Debian | 11, 12 | `scripts/linux/harden.sh` (same script, detects distro) | `docs/checklists/debian.md` |
+| Debian | 11, 12 | `scripts/linux/harden.sh` (detects distro) | `docs/checklists/debian.md` |
 | Ubuntu | 20.04, 22.04, 24.04 | `scripts/linux/harden.sh` | `docs/checklists/ubuntu.md` |
 | FreeBSD | 13, 14 | `scripts/freebsd/harden.sh` | `docs/checklists/freebsd.md` |
 
----
-
-## 2. What was wrong with the old material
-
-The old scripts were a reasonable start, but several things in them **lose points or break the image**. CyberPatriot images almost always have "critical services" listed in the README that must stay running, and the old scripts disabled them blindly.
-
-### Things that could break an image or lose points
-| Old script | Problem | Why it's bad |
-|---|---|---|
-| `Windows_Server_22.ps1` | Disabled the `NTDS` service | `NTDS` *is* Active Directory. On a Domain Controller image, this kills the domain. |
-| `Windows_Server_22.ps1` | `icacls C:\Windows /reset /T` | Resetting permissions on all of `C:\Windows` can break Windows Update, services and logins. |
-| `Windows_Server_22.ps1` | `Enable-BitLocker` on C: | In a VM with no TPM this fails or, worse, leaves you with a drive you can't unlock. |
-| `Windows_Server_22.ps1` | Disabled the built-in Administrator | If you're logged in as Administrator, or it's the only admin, you can lock yourself out. |
-| Both Windows scripts | Disabled RDP, IIS (`W3SVC`), FTP, print spooler and file sharing unconditionally | If the README says "this is a web server" or "RDP must stay on", you lose points for each one. |
-| `secure_windows.ps1` | Password policy via text search-and-replace on `secedit` output | Only worked if the current value was *exactly* the default, so it often silently did nothing. |
-| Linux scripts | `set -euo pipefail` | One harmless failure (a missing package, a missing service) **aborted the whole script halfway**. |
-| Linux scripts | `PasswordAuthentication no` for SSH | Nobody has SSH keys on a competition image, so this locks every user out of SSH, and SSH is often a critical service. |
-| Linux scripts | `ufw --force reset` then allow only SSH | Blocks Apache, MySQL, FTP, Samba and so on, even when the README requires them. |
-| Linux scripts | Purged or disabled `vsftpd`, `smbd`, `cups`, `avahi` with no check | Same problem: they're sometimes required. |
-| Linux scripts | Overwrote `/etc/hosts` with two lines | Deletes the hostname line, so `sudo` prints "unable to resolve host" warnings. |
-| Linux scripts | Unattended-upgrades with **automatic reboot** | Rebooting mid-competition is a bad idea. |
-| Linux scripts | PAM `pam_faillock` lines inserted in the wrong order | You removed PAM lockout in PR #6 because of this. A later commit re-added it. Wrong PAM order can stop **everyone** from logging in. |
-| Mint script | dconf settings with no dconf profile | The screen-lock settings never actually applied. |
-| Mint script | "Empty password" check flagged `!` | `!` means *locked*, not *empty*, so it reported false alarms. |
-
-### What was missing entirely
-- **User management against the README**, which is the single biggest source of points. The old scripts never asked who is supposed to be on the system.
-- Media file hunting (`.mp3`, `.mp4` and so on), which shows up on nearly every image.
-- Defender exclusions, UAC, user rights assignment, security options, and browser settings on Windows.
-- Backdoor and persistence hunting (startup items, scheduled tasks, services in odd paths, `authorized_keys`, `ld.so.preload`, shell aliases).
-- Any notion of "audit first, then fix", which beginners need so they can see what will happen before it happens.
-
-### The old checklists
-They were mostly lists of commands, with little explanation of **why** or **how to check it worked**. Some steps were risky without context, for example deleting `/var/www/html/index.html`, enforcing every AppArmor profile, and a hard-coded password. They also targeted Ubuntu and Windows 10 rather than this season's images.
+Mint and Windows 10/11 are the full checklists. Debian, Ubuntu and Windows Server cover what's different and link back to them for anything identical.
 
 ---
 
-## 3. New script design
+## 3. Script design
 
-The scripts are rebuilt from scratch around one idea: **the README decides what's safe**.
+The old scripts (still in the git history) broke images: they disabled Active Directory on Domain Controllers, stopped services the README required, locked users out of SSH, reset the firewall to SSH-only, and aborted halfway on the first error. They also never checked users against the README, which is the biggest source of points. The new scripts are built around one idea: **the README decides what's safe**.
 
-### Design rules (every script follows these)
-1. **README first.** Before changing anything, the script asks for:
-   - authorized users
-   - authorized administrators
-   - critical services (from the README)
+### Rules every script follows
+1. **README first.** It asks for authorized admins, users and critical services (typed in, or from a config file). It never removes an authorized user or disables a critical service. **With no user list, user removals are report-only.**
+2. **Audit, then Apply.** Audit reports and changes nothing. Apply asks before anything risky (deleting a user, removing software, deleting files) unless you pass `--yes`.
+3. **Menu or all at once.** Run every section, or pick one.
+4. **Never aborts halfway.** Each section runs on its own; failures are logged and the summary shows `OK`, `CHANGED`, `WOULD`, `SKIPPED`, `REVIEW` or `FAILED`.
+5. **Backs up everything** it edits, into a timestamped folder.
+6. **Findings report:** a to-do list of what a human has to decide.
+7. **Safe defaults:** no reboots, SSH password login stays on, firewall ports for critical services open *before* the firewall turns on, Domain Controller services never touched, no BitLocker, no permission resets on system folders.
+8. **Idempotent:** running it twice gives the same result.
+9. **One file per OS family**, easy to download onto an image.
 
-   You can type these in, or put them in a config file. The script never removes an authorized user and never disables a critical service.
-2. **Audit mode and apply mode.**
-   - `audit` only reports what it would change and what looks suspicious. It's safe to run any time.
-   - `apply` makes the changes.
-   - Risky actions (deleting a user, removing software, deleting files) always ask first unless you pass `--yes`.
-3. **Menu or all-at-once.** Run every section, or pick sections from a numbered menu, for example "just do users and passwords".
-4. **Never aborts halfway.** Each section runs on its own. If one fails, the script logs it and moves on. A summary table at the end shows `OK`, `CHANGED`, `SKIPPED`, `FAILED` or `REVIEW`.
-5. **Backs up everything it edits.** Every file is copied to a timestamped backup folder before it's touched, so you can always undo.
-6. **Explains itself.** Every step prints what it's doing and why in plain English, so the scripts double as a learning tool.
-7. **Findings report.** Things a human has to decide are written to a report file:
-   - suspicious files
-   - unknown users
-   - odd scheduled tasks
-   - listening ports
+### Sections
+| Script | Sections |
+|---|---|
+| Linux | users, passwords, firewall (UFW), SSH, services, prohibited software, prohibited files, kernel (sysctl), file permissions, sudo rules, backdoors, logging, AppArmor, login screen and screen lock, critical service hardening (web, database, FTP, Samba…), updates, Firefox |
+| Windows | users, password and lockout policy, security options, user rights, audit policy, Defender, firewall, services, Windows features, remote access, shares, prohibited software, prohibited files, backdoors, other hardening, browsers, server roles (IIS, FTP, DNS, AD), updates |
+| FreeBSD | users, passwords, firewall (pf), SSH, services, software, files, kernel (sysctl), permissions, sudo, backdoors, logging, updates |
 
-   The report is formatted as a to-do list.
-8. **Safe defaults.**
-   - No automatic reboots.
-   - SSH password login stays on.
-   - The firewall opens ports for critical services *before* it turns on.
-   - Domain Controller services are never touched.
-   - No BitLocker.
-   - No permission resets on system folders.
-9. **Idempotent.** Running a script twice gives the same result. It never adds duplicate config lines.
-10. **One file per OS family**, so it's easy to download and run on a competition image.
-
-### Linux script: `scripts/linux/harden.sh` (Mint, Debian, Ubuntu)
-Detects the distro from `/etc/os-release` and adjusts automatically. Mint gets LightDM and Cinnamon handling, Debian gets GDM and `sudo` checks, and so on.
-
-| # | Section | What it does |
-|---|---|---|
-| 1 | Users and groups | <ul><li>Compares real users against the README list.</li><li>Offers to remove unauthorized users.</li><li>Creates missing users.</li><li>Fixes `sudo`/`adm`/`wheel` membership.</li><li>Finds extra UID-0 accounts and hidden users with login shells.</li><li>Finds empty passwords.</li><li>Sets strong passwords.</li><li>Locks root.</li></ul> |
-| 2 | Password policy | <ul><li>`login.defs` aging, applied to existing users with `chage`.</li><li>`pwquality.conf` complexity.</li><li>Password history (`remember=5`).</li><li>Optional, *correctly ordered* account lockout through the distro's own `pam-auth-update` system.</li></ul> |
-| 3 | Updates | <ul><li>Turns on automatic security updates (no auto-reboot).</li><li>Fixes the Mint Update Manager.</li><li>Fixes broken or malicious apt sources.</li><li>Optionally runs a full upgrade.</li></ul> |
-| 4 | Firewall | <ul><li>UFW deny-incoming.</li><li>Allows the ports for each critical service first.</li><li>Turns on logging.</li></ul> |
-| 5 | SSH | <ul><li>Writes a drop-in config file (`sshd_config.d/`) instead of editing the main file.</li><li>Tests it with `sshd -t` and rolls back if the test fails.</li><li>Root login off, empty passwords off, `MaxAuthTries` limit and so on.</li></ul> |
-| 6 | Services | <ul><li>Lists everything running.</li><li>Disables known-risky services (telnet, FTP, rsh, NIS, SNMP, NFS and others) **unless they're critical**.</li><li>Asks about anything it isn't sure of.</li></ul> |
-| 7 | Prohibited software | <ul><li>Finds hacking tools, games, P2P clients and remote-access tools (apt, snap and flatpak).</li><li>Offers to remove them.</li></ul> |
-| 8 | Prohibited files | <ul><li>Finds media files and other suspicious files in home folders and elsewhere.</li><li>Lists them and offers to delete them.</li></ul> |
-| 9 | Kernel (sysctl) | Network and kernel hardening via a drop-in file: redirects, syncookies, ASLR, `ptrace` and so on. |
-| 10 | File permissions | <ul><li>`shadow`, `passwd`, `sudoers` and home folder permissions.</li><li>World-writable files.</li><li>Unusual SUID binaries.</li></ul> |
-| 11 | Sudoers | <ul><li>Finds `NOPASSWD`, `!authenticate` and non-admins with full sudo.</li><li>Validates with `visudo -c` before saving.</li></ul> |
-| 12 | Backdoors and persistence | <ul><li>Cron jobs and systemd timers.</li><li>`rc.local`, `/etc/profile.d`, shell aliases.</li><li>`authorized_keys`, `ld.so.preload`.</li><li>Netcat listeners.</li><li>Suspicious `/etc/hosts` entries (reports them, never wipes the file).</li></ul> |
-| 13 | Logging | Turns on `auditd` and `rsyslog`, and checks log permissions. |
-| 14 | AppArmor | Makes sure it's running, without force-enforcing every profile. |
-| 15 | Desktop / login screen | <ul><li>No guest login, no autologin.</li><li>Screen lock that actually applies, with a correct dconf profile.</li><li>LightDM (Mint) and GDM (Ubuntu/Debian).</li></ul> |
-| 16 | Critical service hardening | Only for services the README lists: Apache, Nginx, MySQL/MariaDB, PHP, vsftpd/ProFTPD/Pure-FTPd, Samba, BIND, Postfix. |
-
-### Windows script: `scripts/windows/Harden.ps1` (10, 11, Server 2016–2022)
-Detects whether it's a workstation, a member server or a **Domain Controller**, and what roles are installed. On a DC it uses Active Directory commands for users and **never touches** AD, DNS, Kerberos, Netlogon, SYSVOL or DFSR.
-
-| # | Section | What it does |
-|---|---|---|
-| 1 | Users and groups | <ul><li>Local (or AD) users vs. the README.</li><li>Disables Guest and DefaultAccount.</li><li>Sets passwords.</li><li>Clears "password never expires" and "password not required".</li><li>Fixes Administrators, Remote Desktop Users, Backup Operators and similar groups.</li></ul> |
-| 2 | Account policies | <ul><li>Password length, history, age, complexity and lockout.</li><li>Builds a proper `secedit` template instead of search-and-replace.</li><li>On a DC: `Set-ADDefaultDomainPasswordPolicy`.</li></ul> |
-| 3 | Security options | <ul><li>UAC.</li><li>Don't display last user name.</li><li>Blank-password restriction.</li><li>Anonymous enumeration off.</li><li>LM hash off, NTLMv2 only.</li><li>SMB signing.</li><li>Ctrl+Alt+Del.</li><li>Logon banner.</li></ul> |
-| 4 | User rights | Removes Everyone, Guests and other non-admins from dangerous rights (debug, take ownership, act as OS and so on). |
-| 5 | Audit policy | Advanced audit subcategories for success and failure, plus forcing subcategory settings. |
-| 6 | Defender | <ul><li>Real-time, cloud, behavior, PUA, script scanning.</li><li>**Removes exclusions**, a common planted vulnerability.</li><li>Updates signatures.</li></ul> |
-| 7 | Firewall | <ul><li>All profiles on, block inbound.</li><li>Keeps rules for critical services.</li><li>Logging on.</li></ul> |
-| 8 | Services | <ul><li>Disables risky services unless critical.</li><li>Makes sure core security services are running.</li><li>DC-safe allow-list.</li></ul> |
-| 9 | Windows features | SMBv1, Telnet/TFTP client and PowerShell v2 off. IIS and FTP only if they're not critical. |
-| 10 | Remote access | RDP off unless critical. If it's critical: Network Level Authentication and high encryption. Remote Assistance off. |
-| 11 | Shares | Lists non-default shares and offers to remove them. On a DC, keeps `NETLOGON` and `SYSVOL`. |
-| 12 | Prohibited software | Reads the installed-programs list and flags hacking tools, games, P2P and remote-access tools. |
-| 13 | Prohibited files | Media files and other suspicious files in user folders. |
-| 14 | Backdoors and persistence | <ul><li>Run keys, startup folders.</li><li>Non-Microsoft scheduled tasks.</li><li>Services in odd folders.</li><li>WMI subscriptions.</li><li>`hosts` file.</li><li>Accessibility-tool hijacks (sticky keys and similar).</li></ul> |
-| 15 | Updates | Windows Update service plus auto-update policy, and starts a scan. |
-| 16 | Misc and browsers | <ul><li>AutoPlay off, SmartScreen on.</li><li>Screen-saver lock.</li><li>LLMNR and NetBIOS off.</li><li>Firefox, Chrome and Edge security policies.</li></ul> |
-
-### FreeBSD script: `scripts/freebsd/harden.sh`
-Same rules, adapted to FreeBSD:
-- users (`pw`), passwords (`login.conf`), `sshd`
-- `pf` firewall, services (`sysrc`), updates (`pkg audit`, `freebsd-update`)
-- security sysctls, `periodic` security reports, cron, SUID checks
-
-FreeBSD only appears in the Semifinals, so it's the lowest priority.
-
-### How the scripts get tested
-- **Linux:** `shellcheck` clean. Real runs (audit and apply) in Debian 12, Ubuntu 22.04 and Linux Mint 21 containers.
-- **Windows:** parsed with PowerShell 7 and PSScriptAnalyzer. Windows-only commands can't run on the test machine, so the class should do a dry run in `audit` mode on a practice image first.
-- **FreeBSD:** `shellcheck` in POSIX-sh mode.
+### Tests
+| Script | How it's tested |
+|---|---|
+| Linux | `tests/linux/run-tests.sh` plants ~30 problems in Debian 12, Ubuntu 22.04, Ubuntu 24.04 and Mint 21.3 containers, runs the script and checks 73 results. It also checks that audit mode changes nothing, that nothing is deleted without a README list, `umask 0000`, and real logins with `pamtester`. |
+| Windows | `tests/windows/Test-HardenLogic.ps1`: 64 logic tests with a fake `secedit`. Parses cleanly, no PSScriptAnalyzer findings, PowerShell 5.1 compatible. |
+| FreeBSD | `tests/freebsd/test-harden-logic.sh`: 50 tests under `dash` with fake FreeBSD commands. `shellcheck -s sh` clean. |
 
 ---
 
-## 4. New checklist design
+## 4. Checklist design
 
-The checklists are for **people who have never done this before**. Every OS gets its own page that you can follow top to bottom without jumping around.
+Written for people who have never done this before. Every step has the same shape:
 
-### Every checklist item has the same shape
-> **☐ Item name**
-> - **What:** one sentence, plain English.
-> - **Why it matters:** what an attacker could do if you skip it.
-> - **How (clicking):** the GUI path, step by step.
-> - **How (typing):** the command, with every part explained.
-> - **Check it worked:** a command or screen that proves it's done.
-> - **⚠️ Careful:** when *not* to do it, for example "skip this if the README says FTP is required".
+- **What:** one plain sentence.
+- **Why it matters:** what an attacker could do if you skip it.
+- **Clicking** and **Typing:** the GUI path and the command, with every part explained.
+- **Check it worked:** a command or screen that proves it.
+- **Careful:** when *not* to do it.
+- **Script:** ✅ the script does it, 🔎 it checks and you decide, ✋ by hand.
 
-### Order of each checklist (the order points are usually won in)
-0. **Before you touch anything:** read the README, take a snapshot, and split up the work.
-1. **Forensics questions first,** because fixing things can destroy the evidence.
-2. Users and groups.
-3. Password and lockout policy.
-4. Updates (start early, they're slow).
-5. Firewall.
-6. Services.
-7. Prohibited software and files.
-8. OS-specific security settings.
-9. Critical service hardening (web, database, FTP, SSH and so on).
-10. Backdoor hunting.
-11. Final checks, and what to do when you're stuck.
+Sections follow the order points are usually won: read the README, forensics questions, run the script, users, passwords, updates, firewall, services, software and files, OS settings, critical services, backdoors, final checks.
 
-### Supporting guides (shared by all OSes)
-- **Start here:** what CyberPatriot is, how scoring works, how a 4-hour round goes, and team roles.
-- **Reading the README:** how to pull out authorized users, admins, critical services and "policy" hints.
-- **Terminal basics (Linux)** and **PowerShell basics (Windows):** for people who have never typed a command.
-- **Forensics questions:** common question types and how to answer each (hashes, base64, finding a file, finding who did what).
-- **Things that lose points:** the classic mistakes, like deleting an authorized user, stopping a critical service, or breaking SSH.
-- **Using the scripts safely.**
-- **Glossary:** every acronym (PAM, UAC, SMB, LLMNR and so on) explained in one or two sentences.
-
-### Formatting choices (so they work on GitHub *and* the website)
-- Warnings use GitHub alert syntax (`> [!WARNING]`). It renders on GitHub, and the website turns it into a coloured box.
-- Each step has a `- [ ] Done` line under its `###` heading. The website turns it into a "Mark this step done" button that remembers progress.
-- No tabs or other site-only features, so everything still reads well on GitHub.
+**Rules for editing checklists** (the website and saved progress depend on them):
+- A step's heading number is its identity: **add new steps at the end of a section, never renumber.**
+- Don't change headings other pages link to.
+- Use the example names alice, bob, carol, erin and mallory.
+- Run `python3 tests/checklists/check-format.py`, `bash tests/checklists/check-shell.sh` and, for Linux, `python3 tests/checklists/linux_lab.py <checklist>`.
 
 ---
 
-## 5. Website (built: `site/`)
+## 5. Website
 
-**Goal:** students open a normal web link and get a clean, searchable site. They never need to understand GitHub.
+Astro + Starlight in [`site/`](site/), built and hosted by Cloudflare Pages on every merge into `main` (each pull request gets a preview link). `docs/` is the single source: `site/scripts/sync-docs.mjs` turns it into pages at build time, so **edit `docs/` and the site updates itself**. Setup: [`site/README.md`](site/README.md).
 
-**What was built:** an [Astro](https://astro.build/) + [Starlight](https://starlight.astro.build/) site in [`site/`](site/), hosted on **Cloudflare Pages**. Setup steps are in [`site/README.md`](site/README.md).
-
-**Why Cloudflare Pages and not GitHub Pages:**
-- Free GitHub Pages needs a public repo. Cloudflare Pages also works with a **private** repo, which matters if the school competes again (rule 3011.5).
-- Cloudflare Access (free for small groups) can put a login in front of the site so only the class can open it.
-- It rebuilds automatically on every merge into `main`, and builds a preview link for every pull request.
-
-**How it stays in sync:** `docs/` is still the single source. At build time `site/scripts/sync-docs.mjs` copies the Markdown into the site and converts it:
-- `# Title` → page title
-- GitHub alerts (`> [!WARNING]`) → coloured boxes
-- links between `.md` files → site links (links to other repo files go to GitHub)
-- `- [ ] Done` items → interactive steps
-
-So the checklists still read well on GitHub, and editing `docs/` updates the website.
-
-**Features:**
-- **Interactive checklists:**
-  - "Mark this step done" on every step, saved in the browser
-  - progress bar and per-section counters in the "On this page" list
-  - "Go to next step" and "Hide finished steps"
-  - "Reset for a new image"
-  - Print with tick boxes
-- **Script tags:** every checklist step says what the hardening script does for it (✅ done, 🔎 checks but you decide, ✋ by hand). Each checklist has a "Fast path: run the hardening script" step right after forensics. After an Apply run, **Tick the script's ✅ steps** ticks them all, so "Hide finished steps" and "Go to next step" skip straight to what's left.
-- **Two sections**, switched with tabs in the header (and at the top of the mobile menu):
-  - **Toolkit**, for experienced students: a no-introduction dashboard (`/toolkit/`), the checklists, tools, script downloads and reference guides.
-  - **Learn**, for beginners: the welcome page, the lessons, the glossary and quiz, and the mentor guide.
-  - Each section has its own sidebar and previous/next links (`site/src/routeData.ts`).
-- **Compact view** on checklists hides "What", "Why it matters" and "Clicking" paragraphs and tip boxes, but keeps the commands, warnings and script tags.
-- **Learning path:** 7 lessons in order, with "Mark as read" and "Next lesson".
-- **Home page:**
-  - "continue where you left off"
-  - progress on every OS card
-  - round filter (Round 1 / 2 / State / Semifinals)
-  - season timeline, tools and golden rules
-- **README config builder:**
-  - paste the README and it finds the admins, users and critical services
-  - generates `my.conf` / `my-readme.psd1` and the exact commands to run
-  - catches common mistakes (a name in both lists, a weak password, you're not an admin)
-- **Round timer:**
-  - 30 min to 6 h, with the game-plan phases scaled to fit
-  - beeps and notifications at each phase
-  - survives a refresh
-  - full-screen projector mode
-- **Command finder:** 139 Linux / Windows / FreeBSD commands, with search, filters and one-click copy.
-- **Glossary quiz:** multiple choice and flashcards, built from `docs/guides/glossary.md`.
-- **Downloads:**
-  - every script with SHA-256 checksums
-  - copy-paste `wget` / `Invoke-WebRequest` / `fetch` commands that use the site's own address
-- **My progress:** everything in one place, with Export / Import (a JSON file a student can hand in) and Reset.
-- **Built-in:**
-  - full-text search (Pagefind)
-  - dark/light mode
-  - mobile layout
-  - copy buttons on code
-  - "Edit page" links to GitHub
-- **No accounts, no tracking:** progress lives in the browser's local storage. Search engines are asked not to index the site.
-
-**Checks:**
-- `npm run check`: TypeScript and Astro.
-- `npm test`: builds the site, then `scripts/verify-build.mjs` checks:
-  - every internal link and #anchor resolves
-  - every checklist step matches its heading
-  - every download matches its checksum
-- `.github/workflows/site.yml` runs both on every pull request that touches `docs/`, `scripts/` or `site/`.
+- **Toolkit** section for experienced students (dashboard, checklists, tools, downloads, reference) and **Learn** section for beginners (7 lessons, glossary, quiz, mentor guide).
+- Interactive checklists: progress, next step, hide finished, compact view, print, reset, **Tick the script's ✅ steps**, and your README names filled into commands.
+- Tools: README config builder, round timer, round log, findings to-do list, command finder, forensics helper, glossary and networking quizzes, Cisco guide, downloads with checksums, progress export/import.
+- No accounts or tracking: progress is saved in the browser.
+- `npm test` builds the site and checks every link, anchor, step id and download checksum. `.github/workflows/site.yml` runs it on every pull request.
 
 ---
 
-## 6. Order of work
+## 6. What's left
 
-1. ✅ Close the superseded PRs (#1 and #3).
-2. ✅ Linux script. It passes 55/55 checks in Debian 12, Ubuntu 22.04 and Mint 21.3 containers.
-3. ✅ Windows script. It passes 38/38 logic tests, parses cleanly, and is PS 5.1-compatible. **Still needs a real run in Audit mode on a Windows practice image.**
-4. ✅ Checklists and guides for all six OSes, plus beginner guides.
-5. ✅ FreeBSD script (shellcheck clean). **Still needs a real run on FreeBSD.**
-6. ✅ New README; the old scripts and checklists are removed (they stay in the git history).
-7. ✅ Website (`site/`, Astro + Starlight on Cloudflare Pages). **The repo owner connects it to Cloudflare once:** see [`site/README.md`](site/README.md).
+### Needs a real machine
+- [ ] Run `Harden.ps1 -Mode Audit` on a real **Windows 11** practice image, then on **Server 2022** (ideally a Domain Controller). Fix anything that errors before trusting Apply mode.
+- [ ] Run `scripts/freebsd/harden.sh` in audit mode on a **FreeBSD 14** VM.
+- [ ] Walk through the Windows and FreeBSD checklists on those images; only their syntax has been checked so far.
 
-## 7. Things the repo owner needs to do by hand
-- **Delete the 8 stale branches.** This session can't delete branches. Go to GitHub → the repo → **Branches** and click the 🗑️ next to:
-  - `Server`
-  - all five `codex/...` branches
-  - `claude/cyber-patriot-scripts-checklists-CYd7Q`
-- **If the school competes again:** the CyberPatriot 19 rules (3010.4) prohibit using AI-written scripts during a competition round, and (3011.5) prohibit publicly posting scripts made for CyberPatriot. If you register a team in a future season:
-  - make the repo private
-  - treat this toolkit as practice material only
-  - have the team write its own competition scripts
+### Every season
+- [ ] Update the round dates and images in `site/src/data/catalog.mjs` and the table in section 2.
+- [ ] Check the new rules book and image lineup for OS changes (for example a new Mint or Debian version) and adjust the checklists.
+
+### Nice to have
+- [ ] A mentor script that plants practice problems on a VM (like `tests/linux/plant-vulns.sh`, but for a real practice image), so the class can make its own images.
+- [ ] A Windows version of that test harness, if a Windows VM becomes available.
