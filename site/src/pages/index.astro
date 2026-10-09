@@ -2,7 +2,7 @@
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
 import UiIcon from '../components/UiIcon.astro';
 import type { UiIconName } from '../data/icons';
-import { CHECKLISTS, IMAGE_NAMES, lessons, pages, roundsFor, SEASON, totalSteps } from '../data/site';
+import { CHECKLISTS, IMAGE_NAMES, lessons, pages, roundsFor, SEASON } from '../data/site';
 
 const osMark: Record<string, string> = {
   windows: 'W',
@@ -95,13 +95,6 @@ const rules = [
       <span class="cp-continue__arrow" aria-hidden="true">→</span>
     </a>
 
-    <!-- Stats -->
-    <dl class="cp-stats">
-      <div><dt>Checklists</dt><dd>{CHECKLISTS.length}</dd></div>
-      <div><dt>Step-by-step items</dt><dd>{totalSteps}</dd></div>
-      <div><dt>Beginner lessons</dt><dd>{lessons.length}</dd></div>
-      <div><dt>Hardening scripts</dt><dd>3</dd></div>
-    </dl>
 
     <!-- Learning path -->
     <section class="cp-home__section" aria-labelledby="path-title">
@@ -403,40 +396,6 @@ const rules = [
     font-size: 1.5rem;
   }
 
-  /* Stats */
-  .cp-stats {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1px;
-    margin: 2.5rem 0 0;
-    border: 1px solid var(--cp-border);
-    border-radius: var(--cp-radius);
-    background: var(--cp-border);
-    overflow: hidden;
-  }
-  @media (min-width: 45rem) {
-    .cp-stats {
-      grid-template-columns: repeat(4, 1fr);
-    }
-  }
-  .cp-stats > div {
-    display: flex;
-    flex-direction: column-reverse;
-    padding: 1rem 1.25rem;
-    background: var(--cp-card);
-  }
-  .cp-stats dt {
-    color: var(--sl-color-gray-3);
-    font-size: var(--sl-text-sm);
-  }
-  .cp-stats dd {
-    margin: 0;
-    color: var(--sl-color-white);
-    font-family: var(--cp-font-display);
-    font-size: 2rem;
-    font-weight: 700;
-    letter-spacing: -0.04em;
-  }
 
   /* Learning path */
   .cp-path {

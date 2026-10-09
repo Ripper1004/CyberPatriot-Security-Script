@@ -120,10 +120,6 @@ Astro + Starlight in [`site/`](site/), built and hosted by Cloudflare Pages on e
 - [ ] Update the round dates and images in `site/src/data/catalog.mjs` and the table in section 2.
 - [ ] Check the new rules book and image lineup for OS changes (for example a new Mint or Debian version) and adjust the checklists.
 
-### Open decisions
-- [ ] Keep or remove the "Edit page" links and the GitHub icon in the site header (they point to the repo, which students may not have access to).
-- [ ] Keep or remove the stats bar on the home page.
-
 ### Nice to have
 - [ ] A mentor script that plants practice problems on a VM (like `tests/linux/plant-vulns.sh`, but for a real practice image), so the class can make its own images.
 - [ ] A Windows version of that test harness, if a Windows VM becomes available.
