@@ -93,19 +93,21 @@ passwd erin                     # ...then give erin a password
 ### 1.3 Admins = the `wheel` group
 - [ ] Done
 
-**Script:** 🔎 Removes non-admins from `wheel` and adds the README admins (only works if you gave AUTHORIZED_ADMINS); you still check sudo/doas rules and the `operator` group it reports.
+**Script:** 🔎 Removes non-admins from `wheel` and adds the README admins (only if you gave AUTHORIZED_ADMINS; without that list it only reports who is in `wheel`); you still check sudo/doas rules, the `operator` group and the `su` line it reports.
 
 ```sh
 pw groupshow wheel
 pw groupmod wheel -d bob        # remove bob
 pw groupmod wheel -m alice      # add alice
+grep pam_group /etc/pam.d/su    # must NOT start with #: only wheel members may use su
 ```
+If the `pam_group` line starts with `#`, anyone who learns the root password can use `su`. Open the file with `ee /etc/pam.d/su` and delete the `#` (the line is `auth requisite pam_group.so no_warn group=wheel root_only fail_safe ruser`).
 If `sudo` or `doas` is installed, also check their rules (section 7).
 
 ### 1.4 Hidden root accounts
 - [ ] Done
 
-**Script:** 🔎 Locks `toor` if it has a password and offers to delete any other UID-0 account; run the check again to be sure only `root` and a locked `toor` are left.
+**Script:** 🔎 Locks `toor` if it has a password (`pw usermod toor -h -`) and offers to delete any other UID-0 account; run the check again to be sure only `root` and a locked `toor` are left.
 
 ```sh
 awk -F: '$3 == 0 {print $1, $2}' /etc/master.passwd
@@ -119,7 +121,7 @@ pw userdel mallory              # any OTHER UID-0 account is a backdoor: delete 
 ### 1.5 Empty passwords and weak passwords
 - [ ] Done
 
-**Script:** 🔎 Locks accounts with an empty password and sets your NEW_PASSWORD for the README users if you give one; otherwise set strong passwords yourself with `passwd`.
+**Script:** 🔎 Locks accounts with an empty password (but never `root` or the account you are logged in as: it tells you to set their password) and sets your NEW_PASSWORD for the README users if you give one; otherwise set strong passwords yourself with `passwd`.
 
 ```sh
 awk -F: '$2 == "" {print $1}' /etc/master.passwd     # accounts with NO password
@@ -128,7 +130,7 @@ pw lock mallory                                      # or lock an account nobody
 ```
 
 > [!CAUTION]
-> If **`root`** is on the empty-password list, give it a password with `passwd root`. **Never lock root**: you would lose `su -`. (The script's lock question includes root too; answer **n** for root.)
+> If **`root`** is on the empty-password list, give it a password with `passwd root`. **Never lock root**: you would lose `su -`. (The script never locks root; it reports it so you can set the password.)
 
 ### 1.6 System accounts that can log in
 - [ ] Done
@@ -186,7 +188,7 @@ This asks for 12+ characters using at least three kinds (lower case, upper case,
 ### 3.1 Write a pf ruleset
 - [ ] Done
 
-**Script:** 🔎 Writes `/etc/pf.conf` that only opens your CRITICAL_SERVICES ports (plus EXTRA_PORTS) and turns pf on, but if pf was already on it only shows the rules; check the open ports match the README.
+**Script:** 🔎 Writes `/etc/pf.conf` that only opens your CRITICAL_SERVICES ports (plus EXTRA_PORTS), with the blacklistd line, and turns pf on, but if pf was already on it only shows the rules; check the open ports match the README.
 
 ```sh
 ee /etc/pf.conf
@@ -208,6 +210,13 @@ service pf start                # or: pfctl -f /etc/pf.conf -e
 pfctl -sr                       # show the rules in use
 ```
 **Check it worked:** `pfctl -s info | head -1` says `Status: Enabled`.
+
+FreeBSD has a second firewall, `ipfw`. If `sysrc -n firewall_enable` says `YES`, the image also uses it (the script reports this but changes nothing). `sysrc firewall_type firewall_myservices` shows how it is set up; `open` lets everything in. To make it block too, use the `workstation` type and list only the README's ports:
+```sh
+sysrc firewall_type=workstation firewall_myservices="22/tcp" firewall_allowservices=any   # 22/tcp = SSH: list only the README's ports
+service ipfw restart
+ipfw list                       # the rules now in use
+```
 
 ---
 
@@ -249,7 +258,7 @@ sysrc syslogd_flags="-ss"       # logging doesn't listen on the network
 sysrc clear_tmp_enable=YES      # empty /tmp at every boot
 sysrc dumpdev=NO                # no crash dumps (they contain memory, i.e. passwords)
 ```
-**Check it worked:** `sysrc sendmail_enable syslogd_flags clear_tmp_enable dumpdev` shows `NONE`, `-ss`, `YES`, `NO`. These take effect at the next boot; `service syslogd restart` applies the syslogd one now (the script does not restart it).
+**Check it worked:** `sysrc sendmail_enable syslogd_flags clear_tmp_enable dumpdev` shows `NONE`, `-ss`, `YES`, `NO`. These take effect at the next boot; `service syslogd restart` applies the syslogd one now (the script restarts syslogd for you when it changes the setting).
 
 ---
 
@@ -269,7 +278,7 @@ Same settings as the [Linux Mint SSH table](linux-mint.md#92-needed-make-it-safe
 sshd -t && service sshd reload
 sysrc blacklistd_enable=YES && service blacklistd start      # blocks password guessing
 ```
-blacklistd blocks through pf, so it only works if `/etc/pf.conf` has the `anchor "blacklistd/*" in` line from 3.1 (the script's pf rules don't include it: add it and run `pfctl -f /etc/pf.conf`).
+blacklistd blocks through pf, so it only works if `/etc/pf.conf` has the `anchor "blacklistd/*" in` line from 3.1. The pf rules the script writes include it; if pf was already set up, the script reports the missing line: add it and run `pfctl -f /etc/pf.conf`.
 
 ---
 
@@ -301,14 +310,22 @@ pkg audit -F                    # lists installed packages with known vulnerabil
 ### 6.3 Updates
 - [ ] Done
 
-**Script:** 🔎 Installs `freebsd-update` and `pkg` updates in --apply if you say yes (or set FULL_UPGRADE=yes); check they finished and reboot if the kernel changed.
+**Script:** 🔎 Installs `freebsd-update` and `pkg` updates in --apply if you say yes (or set FULL_UPGRADE=yes), and reports locked packages and a missing nightly update check; check they finished and reboot if the kernel changed.
 
 ```sh
+pkg lock -l                     # locked packages are never upgraded
+pkg unlock -y openssl           # only if the list shows one: unlock it (use the name from the list)
 freebsd-update fetch install    # OS updates (press q if a list appears)
 pkg update && pkg upgrade -y    # package updates
 freebsd-version -kr             # installed kernel, then running kernel
 ```
 If those two lines differ, reboot so the new kernel runs. If `pkg update` fails, look for a fake repository in `/etc/pkg/FreeBSD.conf` and `/usr/local/etc/pkg/repos/`.
+
+Then turn on the nightly update check (it downloads updates and mails root, but never installs them by itself):
+```sh
+grep freebsd-update /etc/crontab
+echo '0 3 * * * root /usr/sbin/freebsd-update cron' >> /etc/crontab   # only if the grep showed nothing
+```
 
 ### 6.4 Media files
 - [ ] Done
@@ -341,7 +358,7 @@ Remove `NOPASSWD` (sudo) and `nopass` (doas). Only the README admins (or `%wheel
 ### 8.1 /etc/sysctl.conf
 - [ ] Done
 
-**Script:** 🔎 Writes every setting to `/etc/sysctl.conf` and applies most of them now; run `service sysctl restart` so `net.inet.ip.forwarding=0` takes effect too.
+**Script:** ✅ Done by the script (`kernel` section).
 
 Open the file with `ee /etc/sysctl.conf` and make sure it has these lines (change a line that already sets the same name instead of adding a second one):
 ```
@@ -408,7 +425,7 @@ sysrc kern_securelevel_enable=YES kern_securelevel=1
 ### 9.1 Important files and SUID programs
 - [ ] Done
 
-**Script:** 🔎 Fixes the permissions on the important files and offers to remove SUID from dangerous programs; you still look up the other unusual SUID programs it reports.
+**Script:** 🔎 Fixes the permissions on the important files and offers to remove SUID from dangerous programs (it searches every UFS, ZFS and tmpfs file system, so `/home` is included); you still look up the other unusual SUID programs it reports.
 
 ```sh
 ls -l /etc/master.passwd /etc/spwd.db      # must be -rw------- root wheel
@@ -467,7 +484,7 @@ freebsd-update IDS | less        # lists system files that differ from the offic
 sysrc auditd_enable=YES && service auditd start
 grep ^flags /etc/security/audit_control       # e.g. flags:lo,aa,ad
 ```
-**Check it worked:** `service auditd status` says it is running (if it was already running before the flags changed, `audit -s` reloads them; the script does not do that), and `praudit /var/audit/current | tail` shows recent events (logins, `su`).
+**Check it worked:** `service auditd status` says it is running (if it was already running before the flags changed, `audit -s` reloads them; the script does that for you), and `praudit /var/audit/current | tail` shows recent events (logins, `su`).
 
 ---
 

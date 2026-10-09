@@ -23,6 +23,7 @@
 VERSION="2.0.0"
 MODE=""; ASSUME_YES=0; CONFIG_FILE=""; ONLY=""
 AUTHORIZED_USERS=""; AUTHORIZED_ADMINS=""; CRITICAL_SERVICES=""; NEW_PASSWORD=""; FULL_UPGRADE="ask"; EXTRA_PORTS=""
+ADMINS_GIVEN=0; LISTS_GIVEN=0   # did the README info name any admins / any users? (set before the runner is added)
 RUN_ID=$(date +%Y%m%d-%H%M%S)
 WORK_DIR=/root/cyberpatriot
 BACKUP_DIR=$WORK_DIR/backups/$RUN_ID
@@ -171,6 +172,8 @@ finalize_readme() {
   AUTHORIZED_USERS=$(echo "$AUTHORIZED_USERS" | tr ',;' '  ')
   AUTHORIZED_ADMINS=$(echo "$AUTHORIZED_ADMINS" | tr ',;' '  ')
   CRITICAL_SERVICES=$(echo "$CRITICAL_SERVICES" | tr ',;' '  ' | tr '[:upper:]' '[:lower:]')
+  [ -n "$(echo "$AUTHORIZED_ADMINS" | tr -d ' ')" ] && ADMINS_GIVEN=1
+  [ -n "$(echo "$AUTHORIZED_ADMINS$AUTHORIZED_USERS" | tr -d ' ')" ] && LISTS_GIVEN=1
   ME=${SUDO_USER:-${DOAS_USER:-$(logname 2>/dev/null)}}
   if [ -n "$ME" ] && [ "$ME" != root ] && ! in_list "$ME" $AUTHORIZED_ADMINS $AUTHORIZED_USERS; then
     AUTHORIZED_ADMINS="$AUTHORIZED_ADMINS $ME"
@@ -178,6 +181,7 @@ finalize_readme() {
   echo "  Admins:            ${AUTHORIZED_ADMINS:-(none given)}"
   echo "  Standard users:    ${AUTHORIZED_USERS:-(none given)}"
   echo "  Critical services: ${CRITICAL_SERVICES:-(none)}"
+  [ "$LISTS_GIVEN" -eq 1 ] || warn "No README user list given: the script will NOT delete users or remove anyone from wheel."
 }
 
 # ============================================================================
@@ -188,16 +192,22 @@ sec_users() {
   info "Extra root accounts (UID 0)"
   why "Only root (and FreeBSD's built-in, LOCKED 'toor') should have UID 0."
   awk -F: '$3 == 0 && $1 != "root" { print $1 ":" $2 }' /etc/master.passwd | while IFS=: read -r _u _pw; do
-    if [ "$_u" = toor ] && [ "$_pw" = "*" ]; then result OK "toor exists but is locked (FreeBSD default)"; continue; fi
+    if [ "$_u" = toor ]; then
+      # '*' is the FreeBSD default; 'pw lock' (or the checklist) leaves '*LOCKED*...'
+      case $_pw in '*'|'*LOCKED*'*) result OK "toor exists but is locked (FreeBSD default)"; continue ;; esac
+      result REVIEW "toor (FreeBSD's spare root account) has a password, so it is a second way in as root"
+      ask "Lock toor (password field set to *)?" y && fix "Locked toor" pw usermod toor -h -
+      continue
+    fi
     result REVIEW "Account '$_u' has UID 0 and can log in (a hidden root account)"
-    if [ "$_u" = toor ]; then ask "Lock the toor account?" y && fix "Locked toor" pw lock toor
-    elif ask "Delete the hidden root account '$_u'?" y; then fix "Deleted $_u" pw userdel -n "$_u"; fi
+    if ask "Delete the hidden root account '$_u'?" y; then fix "Deleted $_u" pw userdel -n "$_u"; fi
   done
 
   info "Comparing users with the README"
   why "Every account that is not in the README is a way in for an attacker."
-  if [ -z "$(echo "$_all" | tr -d ' ')" ]; then
+  if [ "$LISTS_GIVEN" -eq 0 ]; then
     result SKIPPED "No README user list - not checking for unauthorized users"
+    result REVIEW "Users on this machine: $(human_users | tr '\n' ' ')(compare with the README by hand)"
   else
     for _u in $(human_users); do
       in_list "$_u" $_all && continue
@@ -214,6 +224,7 @@ sec_users() {
   info "Administrator group (wheel - members can use 'su' to become root)"
   for _m in $(pw groupshow wheel 2>/dev/null | cut -d: -f4 | tr ',' ' '); do
     [ "$_m" = root ] && continue
+    if [ "$ADMINS_GIVEN" -eq 0 ]; then result REVIEW "'$_m' is in the wheel (admin) group (no README admin list to compare)"; continue; fi
     in_list "$_m" $AUTHORIZED_ADMINS && continue
     result REVIEW "'$_m' is in the wheel (admin) group but is not an authorized admin"
     ask "Remove '$_m' from wheel?" y && fix "Removed $_m from wheel" pw groupmod wheel -d "$_m"
@@ -227,9 +238,17 @@ sec_users() {
   for _m in $(pw groupshow operator 2>/dev/null | cut -d: -f4 | tr ',' ' '); do
     in_list "$_m" $AUTHORIZED_ADMINS || result REVIEW "'$_m' is in the 'operator' group (can shut down and read disks)"
   done
+  if grep -Eq '^[[:space:]]*auth[[:space:]]+requisite[[:space:]]+pam_group\.so.*group=wheel' /etc/pam.d/su 2>/dev/null; then
+    result OK "Only wheel members can use su (pam_group in /etc/pam.d/su)"
+  else
+    result REVIEW "/etc/pam.d/su has no active pam_group line: anyone who knows the root password can use su (see checklist step 1.3)"
+  fi
 
   info "Accounts with no password"
   awk -F: '$2 == "" { print $1 }' /etc/master.passwd | while read -r _u; do
+    if [ "$_u" = root ] || [ "$_u" = "$ME" ]; then   # locking these would lock you out ('su -' needs root's password)
+      result REVIEW "Account '$_u' has an EMPTY password - set one now with: passwd $_u  (do NOT lock it)"; continue
+    fi
     result REVIEW "Account '$_u' has an EMPTY password"
     ask "Lock '$_u' until it gets a real password?" y && fix "Locked $_u" pw lock "$_u"
   done
@@ -296,8 +315,10 @@ sec_passwords() {
       /^[#[:space:]]*password[[:space:]]+requisite[[:space:]]+pam_passwdqc\.so/ { if (!d) print "password\trequisite\tpam_passwdqc.so\tmin=disabled,disabled,disabled,12,12 similar=deny retry=3 enforce=users"; d = 1; next }
       /^[[:space:]]*password[[:space:]]+required[[:space:]]+pam_unix\.so/ && !d { print "password\trequisite\tpam_passwdqc.so\tmin=disabled,disabled,disabled,12,12 similar=deny retry=3 enforce=users"; d = 1 }
       { print }' "$_pp" >"$_t"
-    cat "$_t" >"$_pp"; rm -f "$_t"
-    result CHANGED "pam_passwdqc on (min length 12, enforce for users) in $_pp"
+    if grep -q '^password.*pam_passwdqc' "$_t"; then
+      cat "$_t" >"$_pp"; result CHANGED "pam_passwdqc on (min length 12, enforce for users) in $_pp"
+    else result FAILED "Could not find where to add pam_passwdqc in $_pp - do checklist step 2.2 by hand"; fi
+    rm -f "$_t"
   fi
   result REVIEW "FreeBSD has no built-in account lockout. For SSH, 'blacklistd' blocks password guessing (the ssh section turns it on)"
 }
@@ -326,9 +347,11 @@ sec_firewall() {
   _tports=$(echo "$_ports" | tr ' ' '\n' | grep -E '^[0-9]+$' | tr '\n' ' ')
   if [ "$(sysrc -n pf_enable 2>/dev/null)" = YES ] && [ -s /etc/pf.conf ]; then
     result OK "pf is enabled with /etc/pf.conf"
+    [ "$(sysrc -n firewall_enable 2>/dev/null)" = YES ] && result REVIEW "ipfw is ALSO on (firewall_enable=YES) - check its rules with: ipfw list"
     grep -Ev '^[[:space:]]*(#|$)' /etc/pf.conf >"$WORK_DIR/pf.tmp"; result REVIEW "Existing pf rules - check they only open the README's ports"; show_file_list "$WORK_DIR/pf.tmp" 15; rm -f "$WORK_DIR/pf.tmp"
     return
   fi
+  [ "$(sysrc -n firewall_enable 2>/dev/null)" = YES ] && result REVIEW "ipfw is on (firewall_enable=YES) - check its rules with: ipfw list (pf will be added next to it)"
   [ -n "$_tports" ] && info "Ports kept open for critical services: $_tports"
   _rules=$(mktemp)
   {
@@ -337,6 +360,7 @@ sec_firewall() {
     echo "set block-policy drop"
     echo "scrub in all"
     echo "block in log all"
+    echo 'anchor "blacklistd/*" in'
     echo "pass out all keep state"
     echo "pass in inet proto icmp icmp-type { echoreq, unreach }"
     echo "pass in inet6 proto icmp6"
@@ -376,6 +400,9 @@ sec_ssh() {
   fi
   set_rc blacklistd_enable YES "blacklistd blocks SSH password guessing"
   [ "$MODE" = apply ] && run service blacklistd start
+  if [ -f /etc/pf.conf ] && ! grep -Eq '^[[:space:]]*anchor[[:space:]]+"blacklistd/\*"' /etc/pf.conf; then
+    result REVIEW "blacklistd can only block through pf: add the line  anchor \"blacklistd/*\" in  to /etc/pf.conf, then run: pfctl -f /etc/pf.conf"
+  fi
 }
 
 # ============================================================================
@@ -389,7 +416,8 @@ sec_services() {
                 "samba_server_enable:samba_server:samba smb" "apache24_enable:apache24:apache web http" "nginx_enable:nginx:nginx web http" \
                 "mysql_enable:mysql-server:mysql database" "postgresql_enable:postgresql:postgresql database" "named_enable:named:dns bind" \
                 "vsftpd_enable:vsftpd:ftp" "proftpd_enable:proftpd:ftp" "cupsd_enable:cupsd:cups print" "avahi_daemon_enable:avahi-daemon:avahi" \
-                "x11vnc_enable:x11vnc:vnc" "lpd_enable:lpd:print"; do
+                "x11vnc_enable:x11vnc:vnc" "lpd_enable:lpd:print" "pureftpd_enable:pure-ftpd:ftp" "rsyncd_enable:rsyncd:rsync" \
+                "rwhod_enable:rwho:rwho"; do
     _var=${_entry%%:*}; _rest=${_entry#*:}; _svc=${_rest%%:*}; _keys=${_rest#*:}
     [ "$(sysrc -n "$_var" 2>/dev/null)" = YES ] || continue
     # shellcheck disable=SC2086
@@ -401,10 +429,15 @@ sec_services() {
     result REVIEW "inetd.conf has active services: $(grep -Ev '^[[:space:]]*(#|$)' /etc/inetd.conf | awk '{print $1}' | tr '\n' ' ')"
     if ! is_critical inetd telnet ftp && ask "Comment out every service in /etc/inetd.conf?" y; then
       backup /etc/inetd.conf; fix "Disabled all inetd services" sed -i '' -E 's/^([^#[:space:]])/#\1/' /etc/inetd.conf
+      [ "$MODE" = apply ] && service inetd onestatus >/dev/null 2>&1 && fix "Reload inetd so it drops those services now" service inetd onereload
     fi
   fi
   if ! is_critical mail smtp sendmail postfix; then set_rc sendmail_enable NONE "Sendmail fully off (no mail server needed)"; fi
+  _was=$(sysrc -n syslogd_flags 2>/dev/null)
   set_rc syslogd_flags "-ss" "syslogd does not listen on the network"
+  if [ "$MODE" = apply ] && [ "$_was" != "-ss" ] && service syslogd onestatus >/dev/null 2>&1; then
+    fix "Restart syslogd so -ss applies now" service syslogd onerestart
+  fi
   set_rc clear_tmp_enable YES "/tmp is emptied at every boot"
   set_rc dumpdev NO "No crash dumps (they can contain passwords)"
   result REVIEW "All enabled services: $(service -e 2>/dev/null | xargs -n1 basename 2>/dev/null | tr '\n' ' ')"
@@ -435,6 +468,9 @@ sec_software() {
     result REVIEW "Vulnerable packages (the updates section can upgrade them)"; show_file_list "$WORK_DIR/pkgaudit2.txt" 10
   else result OK "pkg audit found no known-vulnerable packages"; fi
   rm -f "$WORK_DIR"/pkgaudit*.txt
+  _locked=$(pkg query -e '%k == 1' '%n-%v' 2>/dev/null | tr '\n' ' ')
+  if [ -n "$_locked" ]; then result REVIEW "Locked packages (pkg upgrade skips them; unlock with: pkg unlock -y NAME): $_locked"
+  else result OK "No locked packages"; fi
 }
 
 # ============================================================================
@@ -444,7 +480,7 @@ sec_files() {
   info "Media files and other files that break policy"
   warn "Answer the FORENSICS QUESTIONS first - they sometimes ask about these files!"
   _l=$WORK_DIR/media.txt
-  find /home /usr/home /root /tmp /var/tmp /srv /usr/local/www /opt -xdev -type f \( -iname '*.mp3' -o -iname '*.mp4' -o -iname '*.wav' \
+  find /home /usr/home /root /tmp /var/tmp /srv /usr/local/www /opt -type f \( -iname '*.mp3' -o -iname '*.mp4' -o -iname '*.wav' \
     -o -iname '*.flac' -o -iname '*.ogg' -o -iname '*.avi' -o -iname '*.mkv' -o -iname '*.mov' -o -iname '*.wmv' -o -iname '*.wma' \
     -o -iname '*.m4a' -o -iname '*.aac' -o -iname '*.flv' -o -iname '*.mpg' -o -iname '*.mpeg' -o -iname '*.webm' -o -iname '*.torrent' \) \
     ! -path "$WORK_DIR/*" 2>/dev/null | sort -u >"$_l"
@@ -473,6 +509,7 @@ sec_kernel() {
   done
   if ! is_critical router forwarding gateway; then
     set_conf /etc/sysctl.conf 'net\.inet\.ip\.forwarding' net.inet.ip.forwarding=0 '[[:space:]]*='
+    [ "$MODE" = apply ] && [ "$(sysctl -n net.inet.ip.forwarding 2>/dev/null)" = 1 ] && run sysctl net.inet.ip.forwarding=0
     set_rc gateway_enable NO "This computer is not a router"
   fi
 }
@@ -482,7 +519,8 @@ sec_kernel() {
 # ============================================================================
 check_perm() { # PATH MODE OWNER GROUP
   [ -e "$1" ] || return 0
-  _cur=$(stat -f '%Lp %Su %Sg' "$1")
+  # %Lp alone drops the sticky/setuid digit (1777 shows as 777); %Mp%Lp gives 1777 or 0600
+  _cur=$(stat -f '%Mp%Lp %Su %Sg' "$1"); _cur=${_cur#0}
   if [ "$_cur" = "$2 $3 $4" ]; then result OK "$1 is $2 $3:$4"; return; fi
   fix "$1 -> $2 $3:$4 (was $_cur)" sh -c "chown $3:$4 '$1' && chmod $2 '$1'"
 }
@@ -508,7 +546,9 @@ sec_permissions() {
   done
   info "Programs that run as root for any user (SUID/SGID)"
   _l=$WORK_DIR/suid.txt
-  find / -xdev \( -perm -4000 -o -perm -2000 \) -type f 2>/dev/null >"$_l"
+  # every local disk file system (ZFS puts /home and each user's home on its own), never NFS or devfs
+  _mps=$(mount -p -t ufs,zfs,tmpfs 2>/dev/null | awk '{ print $2 }')
+  for _mp in ${_mps:-/}; do find "$_mp" -xdev \( -perm -4000 -o -perm -2000 \) -type f 2>/dev/null; done | sort -u >"$_l"
   _bad=$(grep -E '/(find|vi|vim|nvi|ex|nano|ee|bash|sh|csh|tcsh|zsh|dash|python[0-9.]*|perl[0-9.]*|ruby[0-9.]*|lua[0-9.]*|php[0-9.]*|node|cp|mv|less|more|awk|tar|env|tee|dd|chmod|chown|nmap|nc|socat|curl|fetch|cat|sed|xargs|gdb|truss)$' "$_l")
   for _f in $_bad; do
     result REVIEW "DANGEROUS: $_f has SUID/SGID (lets any user become root)"
@@ -542,11 +582,11 @@ sec_sudo() {
     done
   done
   if [ -f /usr/local/etc/doas.conf ]; then
-    if grep -Eq '^[^#]*permit[[:space:]]+nopass' /usr/local/etc/doas.conf; then
+    if grep -Eq '^[^#]*permit[^#]*[[:space:]]nopass([[:space:]]|$)' /usr/local/etc/doas.conf; then
       result REVIEW "doas.conf has 'permit nopass' rules"
       if ask "Remove 'nopass' from doas.conf?" y; then
         backup /usr/local/etc/doas.conf
-        fix "Removed nopass from doas.conf" sed -i '' -E 's/permit[[:space:]]+nopass/permit/' /usr/local/etc/doas.conf
+        fix "Removed nopass from doas.conf" sed -i '' -E '/^[^#]*permit/s/[[:space:]]nopass([[:space:]]|$)/\1/' /usr/local/etc/doas.conf
       fi
     else result OK "doas.conf has no nopass rules"; fi
   fi
@@ -563,7 +603,7 @@ sec_backdoors() {
     _u=$(basename "$_f")
     grep -Ev '^[[:space:]]*(#|$)' "$_f" >"$WORK_DIR/cron.tmp"
     [ -s "$WORK_DIR/cron.tmp" ] || continue
-    if ! id "$_u" >/dev/null 2>&1 || ! in_list "$_u" root $AUTHORIZED_ADMINS $AUTHORIZED_USERS; then
+    if ! id "$_u" >/dev/null 2>&1 || { [ "$LISTS_GIVEN" -eq 1 ] && ! in_list "$_u" root $AUTHORIZED_ADMINS $AUTHORIZED_USERS; }; then
       result REVIEW "Crontab for unauthorized or deleted user '$_u'"; show_file_list "$WORK_DIR/cron.tmp" 5
       ask "Delete $_u's crontab?" y && fix "Deleted crontab of $_u" rm -f "$_f"
     elif grep -Eq "$SUSP" "$WORK_DIR/cron.tmp"; then
@@ -633,11 +673,16 @@ sec_backdoors() {
 sec_logging() {
   info "System logging and security auditing"
   set_rc syslogd_enable YES "syslogd is on"
+  [ "$MODE" = apply ] && ! service syslogd onestatus >/dev/null 2>&1 && fix "Start syslogd" service syslogd start
   set_rc auditd_enable YES "auditd (security audit log) starts at boot"
-  if [ -f /etc/security/audit_control ]; then
-    set_conf /etc/security/audit_control 'flags' 'flags:lo,aa,ad' ':'
+  _ac=/etc/security/audit_control; _before=$(cksum <"$_ac" 2>/dev/null)
+  if [ -f "$_ac" ]; then
+    set_conf "$_ac" 'flags' 'flags:lo,aa,ad' ':'
   fi
-  [ "$MODE" = apply ] && run service auditd start
+  if [ "$MODE" = apply ]; then
+    if ! service auditd onestatus >/dev/null 2>&1; then fix "Start auditd" service auditd start
+    elif [ "$(cksum <"$_ac" 2>/dev/null)" != "$_before" ]; then fix "Reload the new audit flags into the running auditd" audit -s; fi
+  fi
 }
 
 # ============================================================================
@@ -646,6 +691,8 @@ sec_logging() {
 sec_updates() {
   info "Updates"
   why "Security fixes come out regularly; old software is the easiest way in."
+  if grep -Eq '^[^#]*freebsd-update[[:space:]]+(-[^[:space:]]+[[:space:]]+)*cron' /etc/crontab 2>/dev/null; then result OK "Daily update check in /etc/crontab"
+  else result REVIEW "No daily update check: add  0 3 * * * root /usr/sbin/freebsd-update cron  to /etc/crontab (checklist step 6.3)"; fi
   if [ "$MODE" = audit ]; then
     result REVIEW "Run updates: freebsd-update fetch install  and  pkg upgrade"
     return
