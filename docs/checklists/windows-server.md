@@ -40,6 +40,8 @@ Get-WindowsFeature | Where-Object Installed | Select-Object Name, DisplayName   
 | **2 (Domain Controller)** | Active Directory Users and Computers (`dsa.msc`) | **Default Domain Policy** (Group Policy, `gpmc.msc`) |
 | **3 (member or standalone server)** | Local Users and Groups (`lusrmgr.msc`) | Local Security Policy (`secpol.msc`) |
 
+The `*-AD*`, `*-GPO` and `*-DnsServer*` commands on this page come with the AD DS and DNS roles, so they work on a Domain Controller. On other servers they fail unless those tools are installed; use the "Standalone / member server" steps there.
+
 ### 1.2 Fast path: run the hardening script
 - [ ] Done
 
@@ -114,7 +116,11 @@ foreach ($g in 'Domain Admins','Enterprise Admins','Schema Admins','Administrato
   "--- $g"; (Get-ADGroupMember $g -ErrorAction SilentlyContinue).SamAccountName }
 Remove-ADGroupMember -Identity 'Domain Admins' -Members bob -Confirm:$false
 Add-ADGroupMember -Identity 'Domain Admins' -Members alice
+Get-ADGroupMember 'Domain Admins' -Recursive | Select-Object SamAccountName   # also shows people hidden inside a nested group
 ```
+
+> [!CAUTION]
+> Some members are there by default: leave them. **Administrators** contains the groups **Domain Admins** and **Enterprise Admins** and the built-in **Administrator**; **Domain Admins**, **Enterprise Admins** and **Schema Admins** contain **Administrator**. Remove only *people* (and planted groups) the README doesn't list as admins.
 
 ### 2.4 Domain Controller: risky account settings
 - [ ] Done
@@ -196,20 +202,39 @@ Same as [Windows 10/11 section 4](windows-10-11.md#4-local-policies).
 
 On a DC, these come from the **Default Domain Controllers Policy** GPO. In `gpmc.msc`, right-click it → **Edit** → **Computer Configuration → Policies → Windows Settings → Security Settings → Local Policies** (Audit Policy, User Rights Assignment, Security Options). Use the tables in the Windows 10/11 checklist, plus these DC settings:
 
+**Back up every GPO before you edit one** (to undo: `Restore-GPO -Name 'Default Domain Controllers Policy' -Path C:\gpo-backup`):
+```powershell
+New-Item -ItemType Directory -Path C:\gpo-backup -Force | Out-Null
+Backup-GPO -All -Path C:\gpo-backup
+```
+
 | Security Option | Set to |
 |---|---|
 | Domain controller: LDAP server signing requirements | **Require signing** |
+| Domain controller: LDAP server channel binding token requirements | **Always** |
 | Domain controller: Allow server operators to schedule tasks | **Disabled** |
 | Domain controller: Refuse machine account password changes | **Disabled** |
 | Domain member: Digitally encrypt or sign secure channel data (always) | **Enabled** |
 | Network security: LDAP client signing requirements | **Negotiate signing** |
+
+**User rights on a DC are different.** Use these rows instead of the Windows 10/11 ones:
+
+| User right (on a DC) | Should be |
+|---|---|
+| Access this computer from the network | Administrators, **Authenticated Users**, **ENTERPRISE DOMAIN CONTROLLERS** (remove Everyone) |
+| Allow log on locally | Administrators. Removing the Operator groups is fine. Never add Users or Domain Users |
+| Allow log on through Remote Desktop Services | Administrators |
+| Deny access to this computer from the network | Guests |
+
+> [!CAUTION]
+> A GPO change on a DC applies to **every computer in the domain** and is copied to every other DC. Removing **Authenticated Users** or **ENTERPRISE DOMAIN CONTROLLERS** from "Access this computer from the network", or adding a big group to a **Deny** right, stops users logging on and computers getting Group Policy. If the score drops or logons break, restore the backup.
 
 Detailed audit settings are under **Security Settings → Advanced Audit Policy Configuration**. Set the account logon, account management, logon/logoff, policy change, privilege use, DS access and system categories to **Success and Failure**.
 
 ### 4.3 Look for planted bad Group Policies
 - [ ] Done
 
-**Script:** 🔎 On a DC the script lists every GPO, newest first; open each one and look for planted settings.
+**Script:** 🔎 On a DC the script lists every GPO, newest first (10 on screen, all of them in the findings file); open each one and look for planted settings.
 
 **Why:** An attacker can create or change a GPO to turn off the firewall, add an admin, or run a script on every computer.
 
@@ -221,6 +246,22 @@ Get-GPO -All | Sort-Object ModificationTime -Descending | Format-Table DisplayNa
 Get-GPOReport -All -ReportType Html -Path C:\gpo-report.html; Start-Process C:\gpo-report.html
 ```
 
+### 4.4 Domain Controller: Zerologon protection
+- [ ] Done
+
+**Script:** 🔎 On a Domain Controller the script sets `FullSecureChannelProtection` to 1 (`security` section); check the "Allow vulnerable Netlogon secure channel connections" policy yourself.
+
+**Why it matters:** Zerologon (CVE-2020-1472) lets anyone on the network take over a Domain Controller without a password. Windows updates since February 2021 always block it, but a planted policy can let chosen accounts use the weak connection again, and an un-updated image is wide open.
+
+**Clicking:** In the **Default Domain Controllers Policy** (4.2) → **Security Options** → **Domain controller: Allow vulnerable Netlogon secure channel connections** must be **Not Defined** (no accounts listed). Install updates too (5.3).
+
+**Typing:**
+```powershell
+New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters' -Name FullSecureChannelProtection -Value 1 -PropertyType DWord -Force
+Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters' | Format-List FullSecureChannelProtection, RequireSignOrSeal, RequireStrongKey
+```
+**Check it worked:** `FullSecureChannelProtection` shows `1`. `RequireSignOrSeal` and `RequireStrongKey` are normally `1` too; if one of them is missing, that is fine, it follows the policy default.
+
 ---
 
 ## 5. Defender, firewall and updates
@@ -228,9 +269,9 @@ Get-GPOReport -All -ReportType Html -Path C:\gpo-report.html; Start-Process C:\g
 ### 5.1 Microsoft Defender
 - [ ] Done
 
-**Script:** 🔎 The script does part of Windows 10/11 section 5 and offers to install Defender if it's missing; turn on Tamper Protection and run a scan yourself.
+**Script:** 🔎 The script does part of Windows 10/11 section 5 and offers to install Defender if it's missing; turn on Tamper Protection (Server 2022) and run a scan yourself.
 
-Same as [Windows 10/11 section 5](windows-10-11.md#5-microsoft-defender-antivirus). If Defender isn't installed: **Server Manager → Add Roles and Features → Features → Microsoft Defender Antivirus**.
+Same as [Windows 10/11 section 5](windows-10-11.md#5-microsoft-defender-antivirus). If Defender isn't installed: **Server Manager → Add Roles and Features → Features → Microsoft Defender Antivirus** (called **Windows Defender Features** on Server 2016), or `Install-WindowsFeature Windows-Defender`, then restart. Server 2016 and 2019 don't show **Tamper Protection** in the Defender settings; skip that part there.
 
 ### 5.2 Firewall
 - [ ] Done
@@ -269,6 +310,8 @@ Same list as [Windows 10/11 section 8](windows-10-11.md#8-services), plus:
 - **Print Spooler**: disable on Domain Controllers unless this is the print server (PrintNightmare).
 - **Windows Remote Management (WinRM)**: Server Manager uses it, so keep it on servers unless the README says otherwise, and lock it down (section 8).
 
+Windows Server has no **Security Center** (`wscsvc`) service, so skip that name in Windows 10/11 step 8.2.
+
 ### 6.2 Never touch these on a Domain Controller
 - [ ] Done
 
@@ -286,9 +329,31 @@ Same list as [Windows 10/11 section 8](windows-10-11.md#8-services), plus:
 | Intersite Messaging | `IsmServ` |
 
 ```powershell
-Get-Service NTDS, DNS, Kdc, Netlogon, DFSR, W32Time, ADWS | Format-Table Name, Status, StartType
+Get-Service NTDS, DNS, Kdc, Netlogon, DFSR, W32Time, ADWS, IsmServ | Format-Table Name, Status, StartType
 ```
 All should be **Running** and **Automatic**.
+
+### 6.3 Print Spooler: PrintNightmare fixes
+- [ ] Done
+
+**Script:** ✅ Done by the script (`security` section sets the three registry values below; the `services` section offers to turn off the Print Spooler when the README doesn't need printing).
+
+**Why it matters:** PrintNightmare (CVE-2021-34527) lets a normal user install a "printer driver" that runs as SYSTEM. If the spooler must keep running, make sure only admins can install drivers.
+
+**Clicking:** `gpedit.msc` (on a DC: the **Default Domain Controllers Policy** in `gpmc.msc`) → **Computer Configuration → Administrative Templates → Printers**:
+- **Limits print driver installation to Administrators**: **Enabled**.
+- **Point and Print Restrictions**: **Enabled**, and both "When installing drivers for a new connection" and "When updating drivers for an existing connection" set to **Show warning and elevation prompt**.
+
+**Typing:**
+```powershell
+$pp = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers\PointAndPrint'
+if (-not (Test-Path $pp)) { New-Item -Path $pp -Force | Out-Null }
+New-ItemProperty -Path $pp -Name RestrictDriverInstallationToAdministrators -Value 1 -PropertyType DWord -Force
+New-ItemProperty -Path $pp -Name NoWarningNoElevationOnInstall -Value 0 -PropertyType DWord -Force
+New-ItemProperty -Path $pp -Name UpdatePromptSettings -Value 0 -PropertyType DWord -Force
+Get-Service Spooler | Format-Table Name, Status, StartType     # Disabled on a DC unless it's the print server
+```
+**Check it worked:** `Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers\PointAndPrint'` shows `RestrictDriverInstallationToAdministrators : 1` and the other two `0`.
 
 ---
 
@@ -297,15 +362,17 @@ All should be **Running** and **Automatic**.
 ### 7.1 Remove roles and features that aren't needed
 - [ ] Done
 
-**Script:** 🔎 The script removes SMBv1, Telnet, TFTP, PowerShell 2.0, SNMP and Simple TCP/IP (asks first) and asks about IIS with default No; decide other roles yourself.
+**Script:** 🔎 The script removes SMBv1, Telnet, TFTP, PowerShell 2.0, SNMP, Simple TCP/IP and (if your config doesn't list ftp) the IIS FTP server (asks first), and asks about IIS with default No; decide other roles yourself.
 
 **Clicking:** **Server Manager → Manage → Remove Roles and Features**. Untick unneeded **features**: Telnet Client, TFTP Client, SMB 1.0/CIFS File Sharing Support, Windows PowerShell 2.0 Engine, SNMP Service, Simple TCP/IP Services. Remove **roles** only if the README clearly doesn't need them (e.g. Web Server (IIS) on a plain DC).
 
 **Typing:**
 ```powershell
 Get-WindowsFeature | Where-Object Installed | Format-Table Name, DisplayName
-Uninstall-WindowsFeature -Name Telnet-Client, TFTP-Client, FS-SMB1, PowerShell-V2
+Uninstall-WindowsFeature -Name Telnet-Client, TFTP-Client, FS-SMB1, PowerShell-V2, Simple-TCPIP
+Uninstall-WindowsFeature -Name SNMP-Service      # only if the README doesn't need SNMP
 ```
+Restart once when it says a restart is needed (SMBv1 removal needs one).
 
 > [!CAUTION]
 > **Never** remove **AD DS**, **DNS Server**, or any role the README mentions.
@@ -350,11 +417,14 @@ Or with `gpedit.msc` → **Administrative Templates → Windows Components → W
 - Look in the site folder (`C:\inetpub\wwwroot` or wherever **Basic Settings** points) for web shells: `.aspx`, `.asp` or `.php` files you don't recognise, e.g. `cmd.aspx` or `shell.aspx`.
 
 ```powershell
-Import-Module WebAdministration
+Import-Module WebAdministration      # if this fails: Install-WindowsFeature Web-Scripting-Tools
 Get-Website | Format-Table Name, State, PhysicalPath
 Set-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter system.webServer/directoryBrowse -Name enabled -Value $false
+Remove-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter system.webServer/httpProtocol/customHeaders -Name . -AtElement @{name='X-Powered-By'}
+Set-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter system.webServer/security/requestFiltering -Name removeServerHeader -Value $true   # Server 2019/2022 only
 Get-ChildItem C:\inetpub -Recurse -Include *.aspx,*.asp,*.php | Select-String -Pattern 'cmd.exe|Process.Start|eval\(|exec\(' | Select-Object Path -Unique
 ```
+If the X-Powered-By header is already gone, that line may print an error; that's fine.
 
 ### 9.2 IIS FTP server
 - [ ] Done
@@ -367,6 +437,12 @@ In `inetmgr`, click the FTP site:
 - **FTP SSL Settings** → **Require SSL connections** (only if a certificate is selected).
 - **FTP User Isolation** → isolate users (so they can't see each other's files).
 - **FTP Logging** → enabled.
+
+```powershell
+Import-Module WebAdministration
+Get-Website | Where-Object { $_.Bindings.Collection.protocol -contains 'ftp' } | Format-Table Name, PhysicalPath   # your FTP site names
+Set-ItemProperty 'IIS:\Sites\Default FTP Site' -Name ftpServer.security.authentication.anonymousAuthentication.enabled -Value $false   # use your site's name from the line above
+```
 
 ### 9.3 DNS server
 - [ ] Done
@@ -382,9 +458,10 @@ Look through the records for anything suspicious, e.g. a record for `update.micr
 **Typing:**
 ```powershell
 Get-DnsServerZone | Format-Table ZoneName, ZoneType, DynamicUpdate, SecureSecondaries, IsDsIntegrated
-Set-DnsServerPrimaryZone -Name corp.local -SecureSecondaries NoTransfer -DynamicUpdate Secure
+Set-DnsServerPrimaryZone -Name corp.local -SecureSecondaries NoTransfer -DynamicUpdate Secure   # change corp.local to your zone name
 Get-DnsServerResourceRecord -ZoneName corp.local | Format-Table HostName, RecordType, RecordData
 ```
+`-DynamicUpdate Secure` works only when **IsDsIntegrated** is `True`. For a zone that isn't, use `-DynamicUpdate None` (unless the README needs dynamic updates).
 
 ### 9.4 Active Directory
 - [ ] Done
@@ -402,20 +479,53 @@ Get-DnsServerResourceRecord -ZoneName corp.local | Format-Table HostName, Record
 
 **Script:** ✋ Not done by the script. Do this by hand.
 
-`dhcpmgmt.msc`: check the scopes and reservations against the README, and make sure **Enable DHCP audit logging** is ticked (server → **Properties**).
+`dhcpmgmt.msc`: check the scopes and reservations against the README, and make sure **Enable DHCP audit logging** is ticked (server → **Properties**). Look at **Scope Options** too: a planted **006 DNS Servers** or **003 Router** pointing at a strange IP sends every client to the attacker.
+
+```powershell
+Get-DhcpServerv4Scope | Format-Table ScopeId, Name, StartRange, EndRange, State
+Get-DhcpServerv4Scope | Get-DhcpServerv4Reservation          # every reservation
+Get-DhcpServerv4OptionValue                                  # server options (006 = DNS servers, 003 = router)
+Get-DhcpServerv4Scope | Get-DhcpServerv4OptionValue          # options set on each scope
+Set-DhcpServerAuditLog -Enable $true
+Get-DhcpServerAuditLog
+```
 
 ### 9.6 File server shares
 - [ ] Done
 
-**Script:** 🔎 If your config lists smb, the script removes Everyone's write access from shares (asks first); you still check the other share and NTFS permissions.
+**Script:** 🔎 If your config lists smb, the script removes Everyone's write access from shares (asks first); if it doesn't, it offers to stop sharing every non-built-in share. You still check the other share and NTFS permissions.
 
 **Clicking:** `fsmgmt.msc` → **Shares**. For each share the README needs: **Properties → Share Permissions** shouldn't give **Everyone: Full Control**, and on the **Security** tab (NTFS), only the right groups should have **Modify / Full control**.
 
 ```powershell
 Get-SmbShare | ForEach-Object { "--- $($_.Name) $($_.Path)"; Get-SmbShareAccess $_.Name | Format-Table AccountName, AccessRight }
+Grant-SmbShareAccess -Name Data -AccountName 'Authenticated Users' -AccessRight Read -Force   # "Data" = your share; use Change only if the README says users must save files here
 Revoke-SmbShareAccess -Name Data -AccountName Everyone -Force
+Get-SmbServerConfiguration | Format-List EnableSMB1Protocol, RequireSecuritySignature   # want False and True
 ```
 On a Domain Controller, leave **NETLOGON** and **SYSVOL** alone.
+
+### 9.7 Turn off SSL 3.0, TLS 1.0 and TLS 1.1
+- [ ] Done
+
+**Script:** ✋ Not done by the script. Do this by hand.
+
+**Why it matters:** These old encryption versions have known breaks. Websites (IIS), FTP over SSL, Remote Desktop and LDAPS should all use TLS 1.2 or newer. Server 2016-2022 still allow TLS 1.0 and 1.1 unless you turn them off.
+
+**Typing:**
+```powershell
+foreach ($p in 'SSL 2.0', 'SSL 3.0', 'TLS 1.0', 'TLS 1.1') {
+  $k = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\$p\Server"
+  if (-not (Test-Path $k)) { New-Item -Path $k -Force | Out-Null }
+  New-ItemProperty -Path $k -Name Enabled -Value 0 -PropertyType DWord -Force | Out-Null
+  New-ItemProperty -Path $k -Name DisabledByDefault -Value 1 -PropertyType DWord -Force | Out-Null }
+```
+This changes only what the server *accepts* (the `Server` keys), not how the server connects out, so programs on it that talk to the internet keep working. Restart the server once (near the end, after saving your work) so every service picks it up.
+
+**Check it worked:** `Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.0\Server'` shows `Enabled : 0`. Then open the website / connect with RDP to make sure the critical services still work, and refresh the Scoring Report: if it stops updating, undo this step.
+
+> [!CAUTION]
+> Very old programs (for example an old SQL Server or FTP server) may only speak TLS 1.0. If a README service stops working after the restart, set `Enabled` back to `1` for the version it needs and restart again.
 
 ---
 
@@ -432,7 +542,7 @@ Use the [Windows 10/11 checklist](windows-10-11.md) for:
 
 ## 11. Final checks
 
-- [ ] Every critical role still works (e.g. `nslookup <domain>` for DNS, open the website for IIS)
+- [ ] Every critical role still works (e.g. `nslookup corp.local` with your domain name for DNS, open the website for IIS)
 - [ ] On a DC: `dcdiag /q` prints no errors (no output = good)
 - [ ] Scoring Report shows **no penalties**
 - [ ] Forensics answers saved

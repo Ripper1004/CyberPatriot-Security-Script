@@ -39,7 +39,7 @@ GNOME: press the **Super (Windows) key**, type `terminal`, press Enter.
 sudo -v
 ```
 - **No error:** good, use `sudo` like on Mint.
-- **"user is not in the sudoers file"** or **"sudo: command not found":** use the **root password** from the README:
+- **"Sorry, user ... may not run sudo"**, **"user is not in the sudoers file"** or **"sudo: command not found":** use the **root password** from the README:
   ```bash
   su -               # note the dash! it asks for ROOT's password
   ```
@@ -66,13 +66,15 @@ They must **log out and back in** before `sudo` works for them.
 
 Same tools as [Mint section 1](linux-mint.md#1-forensics-questions-do-these-first), **except the logs:**
 ```bash
-journalctl _COMM=sshd | tail -50              # SSH logins
-journalctl _COMM=sudo                         # every sudo command
-journalctl -u cron --since "2 days ago"       # cron jobs that ran
-journalctl --list-boots                       # boot history
+sudo journalctl _COMM=sshd | tail -50         # SSH logins
+sudo journalctl _COMM=sudo                    # every sudo command
+sudo journalctl -u cron --since "2 days ago"  # cron jobs that ran
+sudo journalctl --list-boots                  # boot history
 last -a | head -20                            # recent logins
 ```
-`/var/log/auth.log` only exists if `rsyslog` is installed.
+Without `sudo` (or root), `journalctl` shows only **your own** messages, so a login by someone else would be missing.
+
+`/var/log/auth.log` only exists if `rsyslog` is installed (Debian 11 has it; Debian 12 doesn't until you install it in step 10.1, and then it only has new events).
 
 ### 1.2 Fast path: run the hardening script
 - [ ] Done
@@ -193,7 +195,7 @@ sudo passwd -S root       # P = has a password, L = locked
 
 Follow [Mint section 3](linux-mint.md#3-password-and-lockout-policy). Debian 12 has `pam_faillock`, and its `common-auth` has the same layout (including the comment line between `pam_unix` and `pam_deny`, which is why the order in Mint 3.6 matters).
 
-`libpam-pwquality` isn't installed by default:
+`libpam-pwquality` isn't installed by default (Mint 3.3 starts by installing it):
 ```bash
 sudo apt install libpam-pwquality
 ```
@@ -230,9 +232,14 @@ Prefer clicking? `sudo apt install gufw`, then open **Firewall Configuration**.
 **Script:** 🔎 The script flags unofficial sources, `[trusted=yes]` and a missing security source under REVIEW; you remove the bad ones.
 
 ```bash
-cat /etc/apt/sources.list; ls /etc/apt/sources.list.d/
+grep -rs '^[^#]' /etc/apt/sources.list*       # every source line, with the file it is in
 ```
-For Debian 12 you should see **`deb.debian.org/debian bookworm`**, **`bookworm-updates`** and **`security.debian.org/debian-security bookworm-security`**. A missing **security** line means no security updates. Anything else (especially with `[trusted=yes]`) should be removed unless the README needs it.
+The sources can be in `/etc/apt/sources.list` (one line per source: `deb http://... bookworm main`) or in a `.sources` file in `/etc/apt/sources.list.d/` (blocks of `URIs:`, `Suites:`, `Components:` lines). Check both. Ignore backup copies (names ending in `.save`, `.bak` or `~`): apt only reads `sources.list` and the `.list` / `.sources` files.
+
+For Debian 12 you should see **`deb.debian.org/debian`** with **`bookworm`** and **`bookworm-updates`**, and **`security.debian.org/debian-security`** (or `deb.debian.org/debian-security`) with **`bookworm-security`**. Debian 11 says `bullseye` instead. The components are normally `main` (Debian 12 often adds `non-free-firmware`): that's fine.
+- A missing **security** source means no security updates.
+- Anything else, especially with `[trusted=yes]` or `Trusted: yes`, should be removed unless the README needs it.
+- A **`deb cdrom:`** line makes `apt update` fail or ask for the install disc. Put a `#` in front of it (`sudo nano /etc/apt/sources.list`).
 
 ### 5.2 Install all updates
 - [ ] Done
@@ -253,8 +260,9 @@ sudo apt full-upgrade -y
 ```bash
 sudo apt install unattended-upgrades
 sudo dpkg-reconfigure -plow unattended-upgrades       # answer Yes
-cat /etc/apt/apt.conf.d/20auto-upgrades               # both lines should be "1"
+cat /etc/apt/apt.conf.d/20auto-upgrades
 ```
+**Check it worked:** the file has `APT::Periodic::Update-Package-Lists "1";` and `APT::Periodic::Unattended-Upgrade "1";` (the script also adds two more lines; that's fine).
 
 ### 5.4 Held packages
 - [ ] Done
@@ -262,8 +270,21 @@ cat /etc/apt/apt.conf.d/20auto-upgrades               # both lines should be "1"
 **Script:** ✅ Done by the script (`updates` section).
 
 ```bash
-apt-mark showhold; sudo apt-mark unhold <name>
+apt-mark showhold              # anything listed will never update
+sudo apt-mark unhold firefox-esr        # change firefox-esr to each name the line above printed
 ```
+
+### 5.5 Update Firefox ESR and the README's apps
+- [ ] Done
+
+**Script:** 🔎 Done only if the script installed all updates (FULL_UPGRADE=yes or you said yes); still check these apps.
+
+**What:** On Debian, Firefox is the package **`firefox-esr`** (there is no `firefox` package, so `apt install firefox` fails). Thunderbird, LibreOffice and the README's critical services also update through `apt`. Step 5.2 updates them all; if you skipped it or it failed, update the important ones on their own:
+```bash
+apt list --upgradable 2>/dev/null | grep -Ei 'firefox|thunderbird|libreoffice'   # anything listed is out of date
+sudo apt install --only-upgrade firefox-esr thunderbird      # skips any that aren't installed
+```
+**Check it worked:** run the `apt list --upgradable` line again: it prints nothing.
 
 ---
 
@@ -274,7 +295,7 @@ apt-mark showhold; sudo apt-mark unhold <name>
 
 **Script:** 🔎 The script can stop SSH, VNC and Samba if the README doesn't need them, but it doesn't change GNOME's Sharing settings; turn those off here.
 
-**Clicking:** **Settings → Sharing** (GNOME 43: **Settings → System → Sharing** on newer versions). Turn **off** anything the README doesn't need: **Remote Desktop / Screen Sharing**, **Remote Login** (that's SSH), **File Sharing**, **Media Sharing**.
+**Clicking:** **Settings → Sharing** (in the list on the left). Turn **off** anything the README doesn't need: **Remote Desktop / Screen Sharing**, **Remote Login** (that's SSH), **File Sharing**, **Media Sharing**.
 
 ### 6.2 Turn off services that aren't needed
 - [ ] Done
@@ -285,8 +306,8 @@ Same table and commands as [Mint section 6](linux-mint.md#6-services):
 ```bash
 systemctl list-units --type=service --state=running
 sudo ss -tulpn
-sudo systemctl disable --now <service>
-sudo apt purge <package>
+sudo systemctl disable --now vsftpd     # change vsftpd to the service you are turning off
+sudo apt purge vsftpd                   # remove it completely (change the name here too)
 ```
 
 ---
@@ -303,6 +324,7 @@ Follow [Mint section 7](linux-mint.md#7-prohibited-software-and-files). Debian's
 dpkg -l | grep -Ei 'gnome-games|aisleriot|mines|sudoku|mahjongg|chess|robots|tetravex|nibbles|klotski|quadrapassel|swell-foop|tali|four-in-a-row|five-or-more|hitori|iagno|lightsoff'
 sudo apt purge gnome-games && sudo apt autoremove
 ```
+Debian's standard install also includes **`netcat-traditional`** (the `nc` command, a favourite for backdoors). The script removes it; by hand: `sudo apt purge netcat-traditional`, unless the README needs it.
 
 ---
 
@@ -331,13 +353,34 @@ In `[security]`: `DisallowTCP=true`.
 
 **Script:** 🔎 The script sets a 5-minute screen lock for all users with dconf; run the `gsettings` check, and set it by hand if the script says REVIEW.
 
-**Clicking:** **Settings → Privacy (& Security) → Screen Lock**: **Automatic Screen Lock: On**, **Automatic Screen Lock Delay: Screen Turns Off**. Then **Settings → Power → Screen Blank: 5 minutes**.
+**Clicking:** **Settings → Privacy → Screen** (Debian 11: **Privacy → Screen Lock**): **Blank Screen Delay: 5 minutes**, **Automatic Screen Lock: On**, **Automatic Screen Lock Delay: Screen Turns Off**.
 
-**Check:**
+**Check** (in a terminal as **your own user**, not after `su -` or with `sudo`: as root, `gsettings` shows root's settings, not yours):
 ```bash
 gsettings get org.gnome.desktop.screensaver lock-enabled     # true
 gsettings get org.gnome.desktop.session idle-delay           # uint32 300
 ```
+
+### 8.3 Hide the list of users on the login screen
+- [ ] Done
+
+**Script:** ✅ Done by the script (`desktop` section).
+
+**What:** Make the GDM login screen ask for a user name instead of showing every account.
+
+**Why it matters:** The list tells anyone at the keyboard which accounts exist, so they only have to guess a password.
+
+**Typing:**
+```bash
+sudo sed -i 's/^# *disable-user-list=true/disable-user-list=true/' /etc/gdm3/greeter.dconf-defaults
+grep disable-user-list /etc/gdm3/greeter.dconf-defaults      # disable-user-list=true, with no # in front
+```
+Or by hand: `sudo nano /etc/gdm3/greeter.dconf-defaults`, find `[org/gnome/login-screen]` and delete the `#` in front of `disable-user-list=true` (add the line under that heading if it isn't there).
+
+**Check it worked:** the `grep` line above. The login screen changes after the next restart.
+
+> [!CAUTION]
+> Don't run `systemctl restart gdm` to see it sooner: that logs you out at once, and anything unsaved (like a forensics answer) is lost.
 
 ---
 
@@ -372,7 +415,11 @@ Audit rules: same as [Mint 14.1](linux-mint.md#14-logging-and-auditing).
 
 **Script:** ✅ Done by the script (`apparmor` section).
 
-Debian has AppArmor turned on by default. Check it's still on: `sudo aa-status`.
+Debian has AppArmor turned on by default. Check it's still on:
+```bash
+sudo aa-status                       # "apparmor module is loaded." and a list of profiles
+sudo systemctl enable --now apparmor # only if it was turned off
+```
 
 ---
 

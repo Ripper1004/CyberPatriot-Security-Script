@@ -42,7 +42,7 @@ On Ubuntu 22.04+, Firefox is a **snap** package, so `apt` doesn't update it:
 ```bash
 snap list                       # every snap app
 sudo snap refresh               # update all snaps (including Firefox)
-sudo snap remove <name>         # remove a prohibited snap app
+sudo snap remove steam          # remove a prohibited snap app: change steam to the name from snap list
 ```
 
 ### Firewall: UFW is installed but OFF
@@ -62,6 +62,7 @@ Same commands as Mint section 4. There's no graphical firewall tool by default; 
 AutomaticLoginEnable=false
 TimedLoginEnable=false
 ```
+The script also hides the list of users on the login screen, in `/etc/gdm3/greeter.dconf-defaults`, the same way as [Debian step 8.3](debian.md#83-hide-the-list-of-users-on-the-login-screen).
 
 ### Screen lock: GNOME settings
 - [ ] Done
@@ -83,12 +84,14 @@ gsettings get org.gnome.desktop.screensaver lock-enabled      # true
 ### SSH on Ubuntu 22.10 and newer
 - [ ] Done
 
-**Script:** 🔎 The script can disable `ssh.service` (it asks, default no) but not `ssh.socket`; if SSH isn't needed, run this command yourself.
+**Script:** 🔎 If the README doesn't list SSH, the script asks (default no) and then disables both `ssh.socket` and `ssh.service`; if the README needs SSH, it leaves the socket alone. Check with the command below.
 
 SSH may be started **on demand** by `ssh.socket`. To turn it off completely:
 ```bash
 sudo systemctl disable --now ssh.socket ssh.service
+systemctl is-enabled ssh.socket ssh.service      # both should say "disabled"
 ```
+If the README needs SSH and you change `Port` or `ListenAddress` in `sshd_config`, the socket decides the port, so also run `sudo systemctl daemon-reload && sudo systemctl restart ssh.socket`.
 
 ### Ubuntu 20.04: no pam_faillock
 - [ ] Done

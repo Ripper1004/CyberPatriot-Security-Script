@@ -203,7 +203,10 @@ function Backup-RegKey([string]$Path) {
 }
 function Get-RegValue([string]$Path, [string]$Name) {
     # .GetValue() treats the name literally (a value can be called '*')
-    try { return (Get-Item -LiteralPath $Path -ErrorAction Stop).GetValue($Name, $null) } catch { return $null }
+    # An empty REG_MULTI_SZ must come back as an empty array, not $null (return ,$v), or Set-Reg rewrites it on every run
+    try { $v = (Get-Item -LiteralPath $Path -ErrorAction Stop).GetValue($Name, $null) } catch { return $null }
+    if ($v -is [array]) { return ,$v }
+    return $v
 }
 
 # Set-Reg PATH NAME VALUE [TYPE] "description"
@@ -265,8 +268,10 @@ function Set-SecPolicy([string]$Section, [System.Collections.IDictionary]$Wanted
     $current = Get-SecPolicy
     $cur = if ($current.ContainsKey($Section)) { $current[$Section] } else { @{} }
     $diff = [ordered]@{}
+    # secedit /export leaves out a right that nobody holds, so "missing" counts as "" (No One)
     foreach ($k in $Wanted.Keys) {
-        $have = if ($cur.Contains($k)) { "$($cur[$k])" } else { $null }
+        $have = if ($cur.Contains($k)) { "$($cur[$k])" } else { '' }
+        if (-not $cur.Contains($k) -and "$($Wanted[$k])" -ne '') { $have = $null }
         if ($have -ne "$($Wanted[$k])") { $diff[$k] = $Wanted[$k] }
     }
     if ($diff.Count -eq 0) { Add-Result 'OK' $Description; return $true }
@@ -285,7 +290,9 @@ function Set-SecPolicy([string]$Section, [System.Collections.IDictionary]$Wanted
     Write-HardenLog ($out | Out-String)
     Remove-Item $inf, $db -Force -ErrorAction SilentlyContinue
     $after = Get-SecPolicy
-    $still = @($diff.Keys | Where-Object { -not ($after.ContainsKey($Section) -and $after[$Section].Contains($_) -and "$($after[$Section][$_])" -eq "$($diff[$_])") })
+    $still = @($diff.Keys | Where-Object {
+        $now = if ($after.ContainsKey($Section) -and $after[$Section].Contains($_)) { "$($after[$Section][$_])" } elseif ("$($diff[$_])" -eq '') { '' } else { $null }
+        $now -ne "$($diff[$_])" })
     if ($still.Count -eq 0) { Add-Result 'CHANGED' "$Description -> $changes"; return $true }
     Add-Result 'FAILED' "$Description - these did not apply: $($still -join ', ') (a Group Policy may be overriding them)"
     return $false
@@ -497,6 +504,7 @@ function Invoke-Users {
         if ($builtinAdmin -and $m.Short -eq $builtinAdmin.Name) { continue }
         if ($m.Short -in @('Domain Admins', 'Enterprise Admins')) { continue }
         if ($script:AuthAdmins -contains $m.Short) { continue }
+        if ($m.Short -eq $script:Me) { Add-Result 'REVIEW' "You ($($m.Full)) are an Administrator but the README list has you as a normal user - not removing you (you would lose admin rights). Check the README."; continue }
         if (-not (Test-HaveUserList)) { Add-Result 'REVIEW' "'$($m.Full)' is an Administrator (no README list to compare)"; continue }
         Add-Result 'REVIEW' "'$($m.Full)' is an Administrator but NOT an authorized admin"
         if (Confirm-Step "Remove '$($m.Full)' from Administrators?" 'y') {
@@ -591,6 +599,7 @@ function Invoke-UsersAD {
         $members = @(Get-ADGroupMember -Identity $g -ErrorAction SilentlyContinue | Where-Object { $_.objectClass -eq 'user' })
         foreach ($m in $members) {
             if ($m.SamAccountName -eq 'Administrator' -or $script:AuthAdmins -contains $m.SamAccountName) { continue }
+            if ($m.SamAccountName -eq $script:Me) { Add-Result 'REVIEW' "You ($($m.SamAccountName)) are in '$g' but the README list has you as a normal user - not removing you. Check the README."; continue }
             if (-not (Test-HaveUserList)) { Add-Result 'REVIEW' "'$($m.SamAccountName)' is in '$g' (no README list to compare)"; continue }
             Add-Result 'REVIEW' "'$($m.SamAccountName)' is in '$g' but is NOT an authorized admin"
             if (Confirm-Step "Remove '$($m.SamAccountName)' from '$g'?" 'y') {
@@ -759,6 +768,9 @@ function Invoke-SecurityOptions {
     Set-Reg $lsa 'EveryoneIncludesAnonymous' 0 'DWord' "Anonymous users don't get 'Everyone' permissions"
     Set-Reg $lsa 'NoLMHash' 1 'DWord' 'Do not store LAN Manager password hashes'
     Set-Reg $lsa 'LmCompatibilityLevel' 5 'DWord' 'Only allow NTLMv2 (refuse LM and NTLM)'
+    # 537395200 = 0x20080000 = "Require NTLMv2 session security" + "Require 128-bit encryption"
+    Set-Reg "$lsa\MSV1_0" 'NTLMMinClientSec' 537395200 'DWord' 'NTLM clients: require NTLMv2 session security and 128-bit encryption'
+    Set-Reg "$lsa\MSV1_0" 'NTLMMinServerSec' 537395200 'DWord' 'NTLM servers: require NTLMv2 session security and 128-bit encryption'
     Set-Reg $lsa 'ForceGuest' 0 'DWord' 'Network logons use their own identity, not Guest'
     Set-Reg $lsa 'DisableDomainCreds' 1 'DWord' "Don't store network passwords in Credential Manager"
     Set-Reg $lsa 'RunAsPPL' 1 'DWord' 'LSA protection on (blocks password-dumping tools; full effect after reboot)'
@@ -791,6 +803,7 @@ function Invoke-SecurityOptions {
     if ($script:IsDC) {
         Set-Reg 'HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters' 'LDAPServerIntegrity' 2 'DWord' 'Domain Controller: require LDAP signing'
         Set-Reg $nl 'RefusePasswordChange' 0 'DWord' 'Domain Controller: allow computer account password changes'
+        Set-Reg $nl 'FullSecureChannelProtection' 1 'DWord' 'Domain Controller: Zerologon enforcement mode on (KB4557222)'
     }
 
     Write-Info 'Other system protections'
@@ -798,6 +811,11 @@ function Invoke-SecurityOptions {
     Set-Reg $inst 'AlwaysInstallElevated' 0 'DWord' 'Installers do NOT always run as admin (HKLM)'
     Set-Reg 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\Installer' 'AlwaysInstallElevated' 0 'DWord' 'Installers do NOT always run as admin (current user)'
     Set-Reg $inst 'EnableUserControl' 0 'DWord' "Users can't change installer options"
+    # PrintNightmare (KB5005010, KB5005652): only admins install printer drivers, and Point and Print always warns
+    $pp = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers\PointAndPrint'
+    Set-Reg $pp 'RestrictDriverInstallationToAdministrators' 1 'DWord' 'Printer drivers: only administrators can install them (PrintNightmare)'
+    Set-Reg $pp 'NoWarningNoElevationOnInstall' 0 'DWord' 'Point and Print: warn and ask for elevation when installing a driver'
+    Set-Reg $pp 'UpdatePromptSettings' 0 'DWord' 'Point and Print: warn and ask for elevation when updating a driver'
     Set-Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' 'ProtectionMode' 1 'DWord' 'Stronger permissions on system objects'
     Set-Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' 'SafeDllSearchMode' 1 'DWord' 'Safe DLL search order'
     Set-Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\kernel' 'DisableExceptionChainValidation' 0 'DWord' 'SEHOP exploit protection on'
@@ -1015,6 +1033,13 @@ function Invoke-Firewall {
     $polBase = 'HKLM:\SOFTWARE\Policies\Microsoft\WindowsFirewall'
     foreach ($p in @('DomainProfile', 'StandardProfile', 'PublicProfile')) {
         if ((Get-RegValue "$polBase\$p" 'EnableFirewall') -eq 0) { Set-Reg "$polBase\$p" 'EnableFirewall' 1 'DWord' "Group Policy no longer turns the $p firewall off" }
+        # Firewall defaults are never changed automatically (that could cut off the scoring report or a README service).
+        if ((Get-RegValue "$polBase\$p" 'DefaultOutboundAction') -eq 1) {
+            Add-Result 'REVIEW' "Group Policy makes the $p firewall block ALL outgoing connections (updates and the scoring report can stop working). Unless the README wants this, run: Remove-ItemProperty -Path '$polBase\$p' -Name DefaultOutboundAction"
+        }
+        if ((Get-RegValue "$polBase\$p" 'DefaultInboundAction') -eq 0) {
+            Add-Result 'REVIEW' "Group Policy makes the $p firewall ALLOW all incoming connections. Fix: Set-ItemProperty -Path '$polBase\$p' -Name DefaultInboundAction -Value 1"
+        }
     }
     foreach ($prof in @(Get-NetFirewallProfile -ErrorAction SilentlyContinue)) {
         $n = $prof.Name
@@ -1023,6 +1048,7 @@ function Invoke-Firewall {
         if ("$($prof.DefaultInboundAction)" -eq 'Block') { Add-Result 'OK' "$n firewall blocks incoming connections by default" }
         else { Invoke-Fix "$n firewall: block incoming connections by default" { Set-NetFirewallProfile -Name $n -DefaultInboundAction Block -ErrorAction Stop } | Out-Null }
         if ("$($prof.DefaultOutboundAction)" -ne 'Block') { Add-Result 'OK' "$n firewall allows outgoing connections (needed for updates)" }
+        else { Add-Result 'REVIEW' "$n firewall blocks ALL outgoing connections by default (updates and the scoring report can stop working). Unless the README wants this, run: Set-NetFirewallProfile -Name $n -DefaultOutboundAction Allow" }
         if ("$($prof.LogBlocked)" -ne 'True') {
             Invoke-Fix "$n firewall: log blocked connections" { Set-NetFirewallProfile -Name $n -LogBlocked True -LogMaxSizeKilobytes 16384 -ErrorAction Stop } | Out-Null
         }
@@ -1228,8 +1254,14 @@ function Invoke-Features {
 function Invoke-RemoteAccess {
     $ts = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
     $rdpTcp = "$ts\WinStations\RDP-Tcp"
+    # A Group Policy value here wins over the normal settings below (reported only: Remote Desktop can lock people out).
+    $tsPol = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services'
+    $polDeny = Get-RegValue $tsPol 'fDenyTSConnections'
+    $polNla = Get-RegValue $tsPol 'UserAuthentication'
     Write-Info 'Remote Desktop'
     if (Test-Critical @('rdp', 'remotedesktop', 'remote-desktop', 'termservice')) {
+        if ($polDeny -eq 1) { Add-Result 'REVIEW' "Group Policy turns Remote Desktop OFF, but the README needs it. Fix: Remove-ItemProperty -Path '$tsPol' -Name fDenyTSConnections" }
+        if ($null -ne $polNla -and $polNla -eq 0) { Add-Result 'REVIEW' "Group Policy turns off Network Level Authentication for Remote Desktop. Fix: Set-ItemProperty -Path '$tsPol' -Name UserAuthentication -Value 1" }
         Write-Why 'The README needs Remote Desktop, so keep it on but make it safer (Network Level Authentication, strong encryption).'
         Set-Reg $ts 'fDenyTSConnections' 0 'DWord' 'Remote Desktop stays ON (critical service)'
         Set-Reg $rdpTcp 'UserAuthentication' 1 'DWord' 'Remote Desktop requires Network Level Authentication'
@@ -1239,6 +1271,7 @@ function Invoke-RemoteAccess {
         Set-Reg 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services' 'fDisableCdm' 1 'DWord' "Remote Desktop can't map the remote user's drives"
     } else {
         Write-Why 'Remote Desktop lets people log in over the network. The README does not need it.'
+        if ($polDeny -eq 0) { Add-Result 'REVIEW' "Group Policy turns Remote Desktop ON, which beats the normal setting. If the README doesn't need it: Remove-ItemProperty -Path '$tsPol' -Name fDenyTSConnections" }
         if ((Get-RegValue $ts 'fDenyTSConnections') -ne 1) {
             Add-Result 'REVIEW' 'Remote Desktop is ON but the README does not list it'
             if (Confirm-Step 'Turn off Remote Desktop?' 'y') {
@@ -1379,6 +1412,11 @@ function Get-SearchRoots {
     return $roots
 }
 
+# Deletes each path literally: names like "song [remix].mp3" are not wildcards
+function Remove-FileList([string[]]$Paths) {
+    foreach ($p in $Paths) { Remove-Item -LiteralPath $p -Force -ErrorAction Stop }
+}
+
 function Invoke-Files {
     Write-Info 'Looking for media files (music, videos) and other files that break policy'
     Write-Why 'Company policy on CyberPatriot images usually bans personal media and hacking tools. Each one removed is often worth points.'
@@ -1408,7 +1446,7 @@ function Invoke-Files {
         Show-List $mediaFiles 20
         if (Confirm-Step "Delete ALL $($mediaFiles.Count) media/torrent files listed above?" 'y') {
             $list = $mediaFiles
-            Invoke-Fix "Deleted $($list.Count) media/torrent files" { $list | Remove-Item -Force -ErrorAction Stop } | Out-Null
+            Invoke-Fix "Deleted $($list.Count) media/torrent files" { Remove-FileList $list } | Out-Null
         }
     }
     if ($tools.Count -eq 0) { Add-Result 'OK' 'No hacking tool files found' }
@@ -1417,7 +1455,7 @@ function Invoke-Files {
         Show-List $tools 20
         if (Confirm-Step "Delete these $($tools.Count) file(s)?" 'y') {
             $list = $tools
-            Invoke-Fix "Deleted $($list.Count) hacking tool files" { $list | Remove-Item -Force -ErrorAction Stop } | Out-Null
+            Invoke-Fix "Deleted $($list.Count) hacking tool files" { Remove-FileList $list } | Out-Null
         }
     }
     if ($data.Count -eq 0) { Add-Result 'OK' 'No password lists or packet captures found' }
@@ -1426,7 +1464,7 @@ function Invoke-Files {
         Show-List $data 20
         if (Confirm-Step "Delete these $($data.Count) file(s)? (only if you have checked them)" 'n' -Strict) {
             $list = $data
-            Invoke-Fix "Deleted $($list.Count) data files" { $list | Remove-Item -Force -ErrorAction Stop } | Out-Null
+            Invoke-Fix "Deleted $($list.Count) data files" { Remove-FileList $list } | Out-Null
         }
     }
     Add-Result 'REVIEW' "Empty the Recycle Bin when you are done with forensics (files there still count)"
@@ -1719,6 +1757,27 @@ function Invoke-Misc {
 # ===========================================================================
 # SECTION: Web browsers
 # ===========================================================================
+# Firefox reads "Preferences" as ONE REG_MULTI_SZ value holding JSON
+# (https://mozilla.github.io/policy-templates/#preferences). Version 2.0.0 of this script wrote a
+# "Preferences" SUBKEY with JSON strings, which Firefox does not understand and which hides the value.
+function Set-FirefoxSafeBrowsing([string]$Ff) {
+    $json = '{"browser.safebrowsing.malware.enabled": {"Value": true, "Status": "locked"}, "browser.safebrowsing.phishing.enabled": {"Value": true, "Status": "locked"}}'
+    $oldJson = '{"Value": true, "Status": "locked"}'
+    foreach ($n in @('browser.safebrowsing.malware.enabled', 'browser.safebrowsing.phishing.enabled')) {
+        if ((Get-RegValue "$Ff\Preferences" $n) -eq $oldJson) { Remove-RegValue "$Ff\Preferences" $n "Firefox: removed an old-format preference ($n)" }
+    }
+    if ($script:Mode -ne 'Audit' -and (Test-Path "$Ff\Preferences") -and (Get-Item -LiteralPath "$Ff\Preferences").ValueCount -eq 0 -and (Get-Item -LiteralPath "$Ff\Preferences").SubKeyCount -eq 0) {
+        Remove-Item -LiteralPath "$Ff\Preferences" -Force -ErrorAction SilentlyContinue
+    }
+    $cur = Get-RegValue $Ff 'Preferences'
+    if ($null -eq $cur -or "$cur" -eq $json) {
+        Set-Reg $Ff 'Preferences' ([string[]]@($json)) 'MultiString' 'Firefox: block dangerous downloads, malware and phishing sites'
+    } else {
+        Add-Result 'REVIEW' "Firefox already has a Preferences policy - check that it keeps browser.safebrowsing.malware.enabled and browser.safebrowsing.phishing.enabled on: $cur"
+    }
+    if (Test-Path "$Ff\Preferences") { Add-Result 'REVIEW' "Old-style Firefox preference policies found in $Ff\Preferences - check them (a value of 0 turns a protection off)" }
+}
+
 function Invoke-Browsers {
     Write-Info 'Microsoft Edge'
     Write-Why 'SmartScreen blocks known phishing and malware sites; pop-up blocking stops scam windows.'
@@ -1727,6 +1786,7 @@ function Invoke-Browsers {
     Set-Reg $edge 'SmartScreenPuaEnabled' 1 'DWord' 'Edge: block potentially unwanted apps'
     Set-Reg $edge 'DefaultPopupsSetting' 2 'DWord' 'Edge: block pop-ups'
     Set-Reg $edge 'DownloadRestrictions' 1 'DWord' 'Edge: block dangerous downloads'
+    Set-Reg $edge 'PasswordManagerEnabled' 0 'DWord' "Edge: doesn't offer to save passwords"
 
     $chromeExe = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($chromeExe) {
@@ -1735,6 +1795,7 @@ function Invoke-Browsers {
         Set-Reg $ch 'SafeBrowsingProtectionLevel' 1 'DWord' 'Chrome: Safe Browsing on'
         Set-Reg $ch 'DefaultPopupsSetting' 2 'DWord' 'Chrome: block pop-ups'
         Set-Reg $ch 'DownloadRestrictions' 1 'DWord' 'Chrome: block dangerous downloads'
+        Set-Reg $ch 'PasswordManagerEnabled' 0 'DWord' "Chrome: doesn't offer to save passwords"
         Add-Result 'REVIEW' "Update Chrome: open it, then Menu > Help > About Google Chrome (version $((Get-Item $chromeExe).VersionInfo.ProductVersion))"
     }
     $ffExe = @("$env:ProgramFiles\Mozilla Firefox\firefox.exe", "${env:ProgramFiles(x86)}\Mozilla Firefox\firefox.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
@@ -1745,8 +1806,8 @@ function Invoke-Browsers {
         Set-Reg "$ff\PopupBlocking" 'Locked' 1 'DWord' "Firefox: users can't turn the pop-up blocker off"
         Set-Reg "$ff\InstallAddonsPermission" 'Default' 0 'DWord' "Firefox: websites can't install add-ons"
         Set-Reg $ff 'HttpsOnlyMode' 'enabled' 'String' 'Firefox: HTTPS-only mode'
-        Set-Reg "$ff\Preferences" 'browser.safebrowsing.malware.enabled' '{"Value": true, "Status": "locked"}' 'String' 'Firefox: block dangerous downloads and malware sites'
-        Set-Reg "$ff\Preferences" 'browser.safebrowsing.phishing.enabled' '{"Value": true, "Status": "locked"}' 'String' 'Firefox: block phishing sites'
+        Set-Reg $ff 'PasswordManagerEnabled' 0 'DWord' "Firefox: doesn't save passwords"
+        Set-FirefoxSafeBrowsing $ff
         Add-Result 'REVIEW' "Update Firefox: Menu > Help > About Firefox (version $((Get-Item $ffExe).VersionInfo.ProductVersion)). Also check Settings > Privacy & Security by hand."
     }
 }
@@ -1784,7 +1845,8 @@ function Invoke-Roles {
                     if (Confirm-Step "Run app pool '$pn' as ApplicationPoolIdentity instead?" 'y') { Invoke-Fix "IIS app pool '$pn' runs as ApplicationPoolIdentity" { Set-ItemProperty "IIS:\AppPools\$pn" -Name processModel.identityType -Value 4 } | Out-Null }
                 }
             }
-            if ((Get-WindowsFeature -Name Web-DAV-Publishing -ErrorAction SilentlyContinue).Installed) { Add-Result 'REVIEW' 'WebDAV publishing is installed in IIS - remove it if the README does not need it' }
+            # Get-WindowsFeature only exists on Windows Server (on Windows 10/11 this line used to end the IIS block with FAILED)
+            if ((Get-Command Get-WindowsFeature -ErrorAction SilentlyContinue) -and (Get-WindowsFeature -Name Web-DAV-Publishing -ErrorAction SilentlyContinue).Installed) { Add-Result 'REVIEW' 'WebDAV publishing is installed in IIS - remove it if the README does not need it' }
         } catch { Add-Result 'FAILED' "IIS hardening - $($_.Exception.Message)" }
     }
     if ((Get-Service FTPSVC -ErrorAction SilentlyContinue) -and (Test-Critical @('ftp', 'ftpsvc'))) {
