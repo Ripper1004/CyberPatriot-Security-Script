@@ -679,7 +679,7 @@ sudo ls -la /home/*/ /tmp /var/tmp /opt     # look for anything odd, including h
 ### 8.1 No guest sessions and no automatic login
 - [ ] Done
 
-**Script:** 🔎 The script turns off guest sessions and auto-login and hides the user list in the LightDM files; run the `grep` check below to be sure no user name is left.
+**Script:** 🔎 The script turns off guest sessions and auto-login and hides the user list in the LightDM files (also old `[SeatDefaults]` sections); run the `grep` check below to be sure no user name is left.
 
 **Clicking:** **Menu → Administration → Login Window → Users** tab. Turn **Allow guest sessions** off (this switch only appears if guest sessions are installed). Clear the **Automatic login** username. Turn **Hide the user list** and **Allow manual login** on, so the login screen doesn't show everyone's name.
 
@@ -695,9 +695,9 @@ autologin-user=
 greeter-hide-users=true
 greeter-show-manual-login=true
 ```
-Also check the other LightDM files, because they can turn these back on:
+Also check the other LightDM files, because they can turn these back on. A section called `[SeatDefaults]` is the old name for `[Seat:*]` and counts the same:
 ```bash
-grep -rE 'autologin|allow-guest|hide-users' /etc/lightdm/ /usr/share/lightdm/lightdm.conf.d/
+grep -rE 'autologin|allow-guest|hide-users' /etc/lightdm/ /etc/xdg/lightdm/ /usr/share/lightdm/lightdm.conf.d/
 ```
 
 **Check it worked:** the `grep` shows no user name after `autologin-user=` and no `allow-guest=true`. The changes show on the login screen after the next restart.
@@ -725,7 +725,7 @@ If it says **The key is not writable**, the script has already set and locked th
 ### 8.3 Don't open USB drives and CDs automatically
 - [ ] Done
 
-**Script:** ✋ Not done by the script. Do this by hand.
+**Script:** ✅ Done by the script (`desktop` section, for every user).
 
 **What:** Stop Mint from mounting, opening and running programs from a USB stick or CD the moment it is plugged in.
 
@@ -733,7 +733,7 @@ If it says **The key is not writable**, the script has already set and locked th
 
 **Clicking:** **Menu → Preferences → Preferred Applications → Removable media** tab → turn **Prompt or start programs on media insertion** off.
 
-**Typing:** in **your own** terminal, **without** `sudo`:
+**Typing:** in **your own** terminal, **without** `sudo` (if it says **The key is not writable**, the script has already set and locked it for every user):
 ```bash
 gsettings set org.cinnamon.desktop.media-handling autorun-never true     # never run programs from media
 gsettings set org.cinnamon.desktop.media-handling automount false        # don't mount drives by themselves
@@ -748,7 +748,7 @@ gsettings set org.cinnamon.desktop.media-handling automount-open false   # don't
 ### 8.4 Ctrl + Alt + Delete doesn't restart the computer
 - [ ] Done
 
-**Script:** ✋ Not done by the script. Do this by hand.
+**Script:** ✅ Done by the script (`desktop` section).
 
 **What:** Stop **Ctrl + Alt + Delete** on a text console (Ctrl + Alt + F3 and similar) from rebooting the machine straight away.
 
@@ -772,7 +772,7 @@ dpkg -l openssh-server       # "ii" at the start = installed
 ### 9.1 Not needed? Remove it.
 - [ ] Done
 
-**Script:** 🔎 If the README doesn't list SSH, the script offers to stop and disable it (default no); removing `openssh-server` is up to you.
+**Script:** 🔎 If the README doesn't list SSH, the script offers to stop and disable it, including `ssh.socket` (default no); removing `openssh-server` is up to you.
 
 If the README doesn't mention SSH or remote logins:
 ```bash
@@ -882,7 +882,7 @@ sudo sysctl -p
 ### 10.2 Turn off core dumps
 - [ ] Done
 
-**Script:** ✋ Not done by the script. Do this by hand.
+**Script:** ✅ Done by the script (`kernel` section).
 
 **What:** Stop crashing programs from writing a "core dump" (a copy of everything in their memory) to disk.
 
@@ -891,9 +891,10 @@ sudo sysctl -p
 **Typing:**
 ```bash
 echo '* hard core 0' | sudo tee -a /etc/security/limits.conf
+grep -rs core /etc/security/limits.conf /etc/security/limits.d/ | grep -v ':#'   # any other "core" line (e.g. "bob - core unlimited") overrides it: delete it
 ```
 
-**Check it worked:** `sudo -u bob bash -c 'ulimit -Hc'` prints `0` (new logins pick it up; your open terminal keeps the old value).
+**Check it worked:** `sudo su - bob -c 'ulimit -Hc'` prints `0` (new logins pick it up; your open terminal keeps the old value). Don't check with `sudo -u bob`: `sudo` sets this limit by itself, so it can print `0` even when the setting is wrong.
 
 ---
 
@@ -1148,7 +1149,7 @@ If the README needs a web server, database, FTP, Samba or similar, **harden it i
 ### 17.1 Firefox security settings
 - [ ] Done
 
-**Script:** ✋ Not done by the script. Do this by hand.
+**Script:** 🔎 The script switches pop-up blocking, add-on install warnings and dangerous-site blocking back on when a user's Firefox files turn them off (`browser` section; Firefox must be closed). HTTPS-Only Mode, passwords and extensions are up to you.
 
 **What:** Turn on Firefox's built-in protections. Images often switch them off.
 

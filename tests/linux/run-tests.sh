@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test harden.sh in throwaway Docker containers.
 #
-#   bash tests/linux/run-tests.sh                 # Debian 12, Ubuntu 22.04, Mint 21.3
+#   bash tests/linux/run-tests.sh                 # Debian 12, Ubuntu 22.04 and 24.04, Mint 21.3
 #   bash tests/linux/run-tests.sh debian:12       # just one image
 #
 # If you are behind an HTTPS proxy with its own certificate, set
@@ -12,7 +12,7 @@
 set -u
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGES=("$@")
-[ ${#IMAGES[@]} -eq 0 ] && IMAGES=(debian:12 ubuntu:22.04 linuxmintd/mint21.3-amd64)
+[ ${#IMAGES[@]} -eq 0 ] && IMAGES=(debian:12 ubuntu:22.04 ubuntu:24.04 linuxmintd/mint21.3-amd64)
 
 extra=()
 if [ -n "${TEST_CA:-}" ]; then

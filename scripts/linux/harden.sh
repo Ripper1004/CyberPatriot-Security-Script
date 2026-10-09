@@ -40,6 +40,8 @@ NO_COLOR=0
 
 AUTHORIZED_USERS=""      # standard (non-admin) users from the README
 AUTHORIZED_ADMINS=""     # administrators from the README
+README_USERS_GIVEN=0     # 1 = the README's user/admin list was entered (set in finalize_readme)
+README_ADMINS_GIVEN=0    # 1 = the README's admin list was entered
 CRITICAL_SERVICES=""     # services the README says must keep running
 NEW_PASSWORD=""          # password to give users (blank = ask, "skip" = don't)
 ENABLE_LOCKOUT="ask"     # account lockout after failed logins: yes | no | ask
@@ -54,6 +56,9 @@ LOG_FILE="$WORK_DIR/harden-$RUN_ID.log"
 REPORT_FILE="$WORK_DIR/findings-$RUN_ID.txt"
 
 export DEBIAN_FRONTEND=noninteractive
+# The script reads the output of ufw, aa-status and other tools; in another
+# language those messages are translated and the checks would never match.
+export LC_ALL=C
 APT_OPTS=(-y -q -o DPkg::Lock::Timeout=180 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
 
 # Section id | title | function
@@ -74,6 +79,7 @@ SECTIONS=(
   "desktop|Login screen and screen lock|sec_desktop"
   "apps|Critical service hardening (web, database, FTP...)|sec_apps"
   "updates|Updates|sec_updates"
+  "browser|Web browser (Firefox)|sec_browser"
 )
 
 # ----------------------------------------------------------------------------
@@ -317,7 +323,10 @@ stage_commit() {
     rm -f "$STAGE_TMP"; result OK "$desc"; return 0
   fi
   if [[ ! -f $file && ${#STAGE_CHANGES[@]} -eq 0 ]]; then
-    rm -f "$STAGE_TMP"; result OK "$desc"; return 0
+    # "printf ... | stage_content" runs in a subshell, so STAGE_CHANGES stays empty:
+    # look at the content itself before deciding the new file isn't needed.
+    if [[ ! -s $STAGE_TMP ]]; then rm -f "$STAGE_TMP"; result OK "$desc"; return 0; fi
+    STAGE_CHANGES+=("write $file")
   fi
   changes=$(printf '%s; ' "${STAGE_CHANGES[@]}"); changes=${changes%; }
   if [[ $MODE == audit ]]; then
@@ -482,6 +491,11 @@ finalize_readme() {
   CRITICAL_SERVICES=${CRITICAL_SERVICES//.service/}
   EXTRA_PORTS=$(normalize_list "$EXTRA_PORTS")
   ENABLE_LOCKOUT=${ENABLE_LOCKOUT,,}; FULL_UPGRADE=${FULL_UPGRADE,,}; SSH_PASSWORD_AUTH=${SSH_PASSWORD_AUTH,,}
+  # Decide BEFORE adding the person running the script: with no README list, that
+  # name alone must not count as "the list" (everyone else would look unauthorized).
+  README_USERS_GIVEN=0; README_ADMINS_GIVEN=0
+  [[ -n $AUTHORIZED_ADMINS$AUTHORIZED_USERS ]] && README_USERS_GIVEN=1
+  [[ -n $AUTHORIZED_ADMINS ]] && README_ADMINS_GIVEN=1
   # The person running the script is always authorized (never lock yourself out).
   if [[ -n ${SUDO_USER:-} && $SUDO_USER != root ]]; then
     in_list "$SUDO_USER" $AUTHORIZED_USERS $AUTHORIZED_ADMINS || AUTHORIZED_ADMINS="$AUTHORIZED_ADMINS $SUDO_USER"
@@ -494,7 +508,7 @@ show_readme_summary() {
   say "  ${C_BLD}Admins:${C_RST}            ${AUTHORIZED_ADMINS:-(none given)}"
   say "  ${C_BLD}Standard users:${C_RST}    ${AUTHORIZED_USERS:-(none given)}"
   say "  ${C_BLD}Critical services:${C_RST} ${CRITICAL_SERVICES:-(none)}"
-  if [[ -z $AUTHORIZED_ADMINS$AUTHORIZED_USERS ]]; then
+  if [[ $README_USERS_GIVEN -eq 0 ]]; then
     warn "No authorized users given: the script will NOT delete or demote anyone."
   fi
 }
@@ -527,7 +541,7 @@ sec_users() {
 
   info "Comparing user accounts with the README"
   why "Every account that is not in the README is a way in for an attacker."
-  if [[ -z $all_auth ]]; then
+  if [[ $README_USERS_GIVEN -eq 0 ]]; then
     result SKIPPED "No README user list given - cannot tell which users are unauthorized"
     result REVIEW "Users on this machine: ${human[*]} (compare with the README by hand)"
   else
@@ -572,7 +586,7 @@ sec_users() {
   for g in "${admin_groups[@]}"; do
     members=$(getent group "$g" | cut -d: -f4)
     for m in ${members//,/ }; do
-      if [[ -z $AUTHORIZED_ADMINS ]]; then result REVIEW "'$m' is in the $g group (no admin list given to compare)"; continue; fi
+      if [[ $README_ADMINS_GIVEN -eq 0 ]]; then result REVIEW "'$m' is in the $g group (no admin list given to compare)"; continue; fi
       if in_list "$m" $AUTHORIZED_ADMINS; then continue; fi
       result REVIEW "'$m' is in the '$g' (admin) group but is NOT an authorized admin"
       if ask "Remove '$m' from the '$g' group?" y; then
@@ -589,7 +603,7 @@ sec_users() {
         fix "Added $u to group sudo" usermod -aG sudo "$u"
       fi
     done
-    [[ -n $AUTHORIZED_ADMINS ]] && result OK "Admin group membership checked"
+    [[ $README_ADMINS_GIVEN -eq 1 ]] && result OK "Admin group membership checked"
   fi
 
   info "Checking other powerful groups (root, shadow, disk, docker, lxd...)"
@@ -600,6 +614,7 @@ sec_users() {
     for m in ${members//,/ }; do
       in_list "$m" $AUTHORIZED_ADMINS && continue
       result REVIEW "'$m' is in the powerful '$g' group"
+      [[ $README_ADMINS_GIVEN -eq 1 ]] || continue
       if ask "Remove '$m' from '$g'?" y; then fix "Removed $m from group $g" gpasswd -d "$m" "$g"; fi
     done
   done
@@ -611,7 +626,7 @@ sec_users() {
   if [[ ${#empty[@]} -eq 0 ]]; then result OK "No accounts with empty passwords"; fi
   for u in "${empty[@]}"; do
     result REVIEW "Account '$u' has an EMPTY password"
-    if ! in_list "$u" $all_auth; then
+    if [[ $README_USERS_GIVEN -eq 1 ]] && ! in_list "$u" $all_auth; then
       if ask "Lock the password of '$u'?" y; then fix "Locked password of $u" passwd -l "$u"; fi
     fi
   done
@@ -845,7 +860,7 @@ SERVICE_CATALOG=(
   "ftp vsftpd|vsftpd|vsftpd|21/tcp|situational"
   "ftp proftpd|proftpd-basic proftpd-core proftpd|proftpd|21/tcp|situational"
   "ftp pure-ftpd pureftpd|pure-ftpd pure-ftpd-common|pure-ftpd|21/tcp|situational"
-  "ssh openssh sshd openssh-server|openssh-server|ssh|22/tcp|careful"
+  "ssh openssh sshd openssh-server|openssh-server|ssh.socket ssh|22/tcp|careful"
   "apache apache2 httpd web webserver http https|apache2|apache2|80/tcp 443/tcp|situational"
   "nginx web webserver http https|nginx nginx-core nginx-full nginx-light|nginx|80/tcp 443/tcp|situational"
   "lighttpd web webserver http|lighttpd|lighttpd|80/tcp 443/tcp|situational"
@@ -957,7 +972,8 @@ sec_firewall() {
 # ============================================================================
 # SECTION: SSH server
 # ============================================================================
-sshd_test() { mkdir -p /run/sshd; /usr/sbin/sshd -t; }
+# sshd refuses to start if its privilege separation folder is group/world-writable.
+sshd_test() { install -d -m 0755 -o root -g root /run/sshd && /usr/sbin/sshd -t; }
 
 sec_ssh() {
   local conf=/etc/ssh/sshd_config f key
@@ -1027,8 +1043,16 @@ EOF
   if grep -qi 'authorized' /etc/issue.net 2>/dev/null; then rm -f "$STAGE_TMP"; result OK "Login warning banner is set"
   else stage_commit "Login warning banner (/etc/issue.net)"; fi
 
-  if [[ $MODE == apply && $HAS_SYSTEMD -eq 1 ]] && unit_active ssh; then
-    fix "Reload SSH so the new settings take effect" systemctl reload-or-restart ssh
+  if [[ $MODE == apply && $HAS_SYSTEMD -eq 1 ]]; then
+    if unit_active ssh; then
+      fix "Reload SSH so the new settings take effect" systemctl reload-or-restart ssh
+    elif unit_active ssh.socket; then
+      # Ubuntu 22.10+ / Mint 22: ssh.socket starts sshd for the next login, which reads the new file.
+      result OK "SSH starts on demand (ssh.socket): the next login uses the new settings"
+    fi
+  fi
+  if [[ $HAS_SYSTEMD -eq 1 ]] && unit_active ssh.socket && grep -Eiqs '^[[:space:]]*(Port|ListenAddress)[[:space:]]' "$conf" /etc/ssh/sshd_config.d/*.conf; then
+    result REVIEW "ssh.socket decides which port SSH listens on: after changing Port/ListenAddress run: sudo systemctl daemon-reload && sudo systemctl restart ssh.socket"
   fi
 }
 
@@ -1054,6 +1078,7 @@ sec_services() {
       for u in $any_unit; do
         [[ $u == *.socket || $u == *.path ]] && continue
         if unit_active "$u"; then result OK "Critical service '$u' is running (keeping it)"
+        elif unit_active "${u%.service}.socket"; then result OK "Critical service '$u' starts on demand (${u%.service}.socket is listening, keeping it)"
         else fix "Start critical service '$u' (README says it must run)" systemctl enable --now "$u"; fi
       done
       [[ -z $any_unit ]] && result OK "Critical service '$name' is installed (keeping it)"
@@ -1192,6 +1217,25 @@ _software_group() {
   if ask "Remove these $label? (${remove[*]})" y; then remove_packages "$label" "${remove[@]}"; fi
 }
 
+# scan_roots: "/" plus every other local disk partition (a separate /home or /var).
+# The scans use find -xdev (don't wander into /proc, network shares or USB sticks),
+# which also stops at the edge of a second partition, so each one is a start point.
+# Bind mounts ("/dev/sda1[/some/dir]") show a folder that is already scanned and are
+# skipped; btrfs subvolumes (/home on "/dev/sda2[/@home]") look the same and are kept.
+scan_roots() {
+  local tgt src fst
+  printf '/\n'
+  have findmnt || return 0
+  while read -r tgt src fst; do
+    [[ $tgt == / || ! -d $tgt ]] && continue
+    case $fst in
+      ext2|ext3|ext4|xfs|f2fs|jfs|reiserfs|nilfs2) [[ $src == /dev/* && $src != *\[* ]] && printf '%s\n' "$tgt" ;;
+      btrfs) [[ $src == /dev/* ]] && printf '%s\n' "$tgt" ;;
+      zfs) [[ $src != *\[* ]] && printf '%s\n' "$tgt" ;;
+    esac
+  done < <(findmnt -rn -o TARGET,SOURCE,FSTYPE 2>/dev/null)
+}
+
 # ============================================================================
 # SECTION: Prohibited files
 # ============================================================================
@@ -1204,11 +1248,12 @@ sec_files() {
                 -o -path /usr/lib32 -o -path /usr/lib64 -o -path /usr/libx32 -o -path /lib -o -path /lib32 -o -path /lib64 \
                 -o -path /var/lib -o -path /boot -o -path /var/cache -o -path /usr/src -o -path /usr/include -o -path /var/log \
                 -o -path /etc -o -path "$WORK_DIR" -o -path /usr/bin -o -path /usr/sbin -o -path /bin -o -path /sbin -o -ipath '*cyberpatriot*' )
-  mapfile -t media < <(find / -xdev \( "${prune[@]}" \) -prune -o -type f \( \
+  local -a roots; mapfile -t roots < <(scan_roots)
+  mapfile -t media < <(find "${roots[@]}" -xdev \( "${prune[@]}" \) -prune -o -type f \( \
       -iname '*.mp3' -o -iname '*.mp4' -o -iname '*.m4a' -o -iname '*.m4v' -o -iname '*.wav' -o -iname '*.wma' -o -iname '*.wmv' \
       -o -iname '*.flac' -o -iname '*.aac' -o -iname '*.ogg' -o -iname '*.oga' -o -iname '*.ogv' -o -iname '*.opus' -o -iname '*.avi' \
       -o -iname '*.mkv' -o -iname '*.mov' -o -iname '*.flv' -o -iname '*.mpg' -o -iname '*.mpeg' -o -iname '*.webm' -o -iname '*.3gp' \
-      -o -iname '*.aiff' -o -iname '*.mid' -o -iname '*.midi' -o -iname '*.torrent' \) -print 2>/dev/null | sort)
+      -o -iname '*.aiff' -o -iname '*.mid' -o -iname '*.midi' -o -iname '*.torrent' \) -print 2>/dev/null | sort -u)
   mapfile -t other < <(find /home /root /srv /opt /tmp /var/tmp /var/www -xdev -type f \( \
       -iname '*.pcap' -o -iname '*.pcapng' -o -iname '*.cap' -o -iname '*password*' -o -iname '*passwd*' -o -iname '*creditcard*' \
       -o -iname '*credit_card*' -o -iname '*ssn*' -o -iname '*.kdbx' -o -iname 'rockyou*' -o -iname '*wordlist*' -o -iname '*hashes*' \) \
@@ -1237,6 +1282,9 @@ sec_files() {
 # ============================================================================
 # SECTION: Kernel and network settings
 # ============================================================================
+# An active limits.conf line that allows core dumps: "<who> soft|hard|- core <more than 0>"
+CORE_LIMIT_RE='^([[:space:]]*[^#[:space:]][^[:space:]]*[[:space:]]+(soft|hard|-)[[:space:]]+core[[:space:]]+([1-9][0-9]*|unlimited|infinity|-1)([[:space:]].*)?)$'
+
 sec_kernel() {
   local -a settings=(
     "net.ipv4.conf.all.send_redirects=0"
@@ -1288,7 +1336,12 @@ sec_kernel() {
   stage_commit "Security settings in /etc/sysctl.conf"
 
   # Other sysctl files can override sysctl.conf. Comment out conflicting lines.
-  for f in /etc/sysctl.d/*.conf /run/sysctl.d/*.conf; do
+  # /usr/lib/sysctl.d and friends belong to packages; a file there that no package
+  # installed was planted (one sorting after 99-sysctl.conf wins at boot).
+  local -a sysctl_files=(/etc/sysctl.d/*.conf /run/sysctl.d/*.conf)
+  mapfile -t -O "${#sysctl_files[@]}" sysctl_files < <(for f in /usr/local/lib/sysctl.d/*.conf /usr/lib/sysctl.d/*.conf /lib/sysctl.d/*.conf; do
+      [[ -f $f && ! -L $f ]] && readlink -f "$f"; done | sort -u | not_owned)
+  for f in "${sysctl_files[@]}"; do
     [[ -f $f && ! -L $f ]] || continue
     local conflicts=()
     for s in "${settings[@]}"; do
@@ -1328,6 +1381,29 @@ sec_kernel() {
     done
     if [[ ${#still[@]} -eq 0 ]]; then result CHANGED "Loaded the new kernel settings (sysctl --system)"
     else result FAILED "Some kernel settings could not be loaded now (${still[*]}) - they apply after a reboot"; fi
+  fi
+
+  info "Core dumps (memory copies of crashed programs)"
+  why "A core dump can hold passwords and keys that were in the program's memory. fs.suid_dumpable above covers root programs; this covers everyone."
+  local lim
+  for lim in /etc/security/limits.conf /etc/security/limits.d/*.conf; do
+    [[ -f $lim ]] || continue
+    [[ $lim == /etc/security/limits.conf ]] || grep -Eq "$CORE_LIMIT_RE" "$lim" || continue
+    stage_begin "$lim"
+    # A line for one user or group beats the "*" line, so any core limit above 0 goes.
+    stage_sed "s/$CORE_LIMIT_RE/# \\1   # disabled by harden.sh (core dumps off)/" "disable core dump limits above 0"
+    if [[ $lim == /etc/security/limits.conf ]]; then
+      stage_set "\\*[ \t]+hard[ \t]+core[ \t]" "*               hard    core            0" "^#[ \t]*end of file"
+      stage_commit "Core dumps off for every user (* hard core 0 in limits.conf)"
+    else
+      stage_commit "Core dump limit in $lim"
+    fi
+  done
+  if [[ -f /etc/systemd/coredump.conf ]]; then
+    stage_begin /etc/systemd/coredump.conf
+    stage_ini Coredump Storage none
+    stage_ini Coredump ProcessSizeMax 0
+    stage_commit "systemd-coredump keeps no core dumps (coredump.conf)"
   fi
 }
 
@@ -1396,15 +1472,16 @@ sec_permissions() {
 
   local prune=( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /snap -o -path /tmp -o -path /var/tmp -o -path /var/crash -o -path /dev/shm -o -ipath '*cyberpatriot*' )
   info "World-writable files (anyone can change them)"
-  local -a ww
-  mapfile -t ww < <(find / -xdev \( "${prune[@]}" \) -prune -o -type f -perm -0002 -print 2>/dev/null)
+  local -a ww roots
+  mapfile -t roots < <(scan_roots)
+  mapfile -t ww < <(find "${roots[@]}" -xdev \( "${prune[@]}" \) -prune -o -type f -perm -0002 -print 2>/dev/null)
   if [[ ${#ww[@]} -eq 0 ]]; then result OK "No world-writable files"; else
     result REVIEW "${#ww[@]} file(s) can be changed by ANY user"
     show_list 15 "${ww[@]}"
     if ask "Remove 'everyone can write' from these files?" y; then fix "Removed world-write from ${#ww[@]} files" chmod o-w -- "${ww[@]}"; fi
   fi
   local -a wwd
-  mapfile -t wwd < <(find / -xdev \( "${prune[@]}" \) -prune -o -type d -perm -0002 ! -perm -1000 -print 2>/dev/null)
+  mapfile -t wwd < <(find "${roots[@]}" -xdev \( "${prune[@]}" \) -prune -o -type d -perm -0002 ! -perm -1000 -print 2>/dev/null)
   if [[ ${#wwd[@]} -eq 0 ]]; then result OK "All world-writable folders have the sticky bit"; else
     result REVIEW "${#wwd[@]} folder(s) are writable by anyone without the 'sticky bit' (users can delete each other's files)"
     show_list 10 "${wwd[@]}"
@@ -1414,7 +1491,7 @@ sec_permissions() {
   info "Programs that run as root for any user (SUID/SGID)"
   why "A SUID program always runs as its owner (root). SUID on find, vim, bash or python lets any user become root."
   local -a suid danger unknown
-  mapfile -t suid < <(find / -xdev \( "${prune[@]}" \) -prune -o -type f \( -perm -4000 -o -perm -2000 \) -print 2>/dev/null)
+  mapfile -t suid < <(find "${roots[@]}" -xdev \( "${prune[@]}" \) -prune -o -type f \( -perm -4000 -o -perm -2000 \) -print 2>/dev/null)
   for f in "${suid[@]}"; do
     if [[ $f =~ $DANGER_SUID_RE ]]; then danger+=("$f")
     elif ! [[ $f =~ $SAFE_SUID_RE ]]; then unknown+=("$f"); fi
@@ -1432,7 +1509,7 @@ sec_permissions() {
 
   info "Files with no owner (left behind by deleted users)"
   local -a noown
-  mapfile -t noown < <(find / -xdev \( "${prune[@]}" \) -prune -o \( -nouser -o -nogroup \) -print 2>/dev/null | head -200)
+  mapfile -t noown < <(find "${roots[@]}" -xdev \( "${prune[@]}" \) -prune -o \( -nouser -o -nogroup \) -print 2>/dev/null | head -200)
   if [[ ${#noown[@]} -eq 0 ]]; then result OK "No orphaned files"; else
     result REVIEW "${#noown[@]} file(s) belong to users that no longer exist - check them for prohibited content"
     show_list 10 "${noown[@]}"
@@ -1501,7 +1578,7 @@ sec_sudoers() {
       if [[ $u != %* ]] && in_list "$u" $AUTHORIZED_ADMINS; then continue; fi
       problems+=("rule for $u")
       result REVIEW "$f gives '$u' sudo rights: $line"
-      if ask "Disable this sudo rule?" y; then
+      if [[ $README_ADMINS_GIVEN -eq 1 ]] && ask "Disable this sudo rule?" y; then
         local esc; esc=$(printf '%s' "$line" | sed 's/[][\.*^$/()+?{}|]/\\&/g')
         stage_sed "s/^${esc}\$/# & # disabled by harden.sh/" "disable rule for $u"
       fi
@@ -1579,13 +1656,13 @@ sec_backdoors() {
     [[ -f $f ]] || continue
     u=$(basename "$f")
     mapfile -t crons < <(grep -Ev '^[[:space:]]*(#|$)' "$f")
-    [[ ${#crons[@]} -eq 0 ]] && continue
-    if ! id "$u" >/dev/null 2>&1 || { [[ -n $all_auth && $u != root ]] && ! in_list "$u" $all_auth; }; then
+    if ! id "$u" >/dev/null 2>&1 || { [[ $README_USERS_GIVEN -eq 1 && $u != root ]] && ! in_list "$u" $all_auth; }; then
       result REVIEW "Crontab for unauthorized or deleted user '$u'"
       show_list 5 "${crons[@]}"
       if ask "Delete $u's crontab?" y; then fix "Deleted crontab of $u" rm -f "$f"; fi
       continue
     fi
+    [[ ${#crons[@]} -eq 0 ]] && continue
     local -a susp
     mapfile -t susp < <(printf '%s\n' "${crons[@]}" | grep -E "$SUSPICIOUS_RE")
     if [[ ${#susp[@]} -gt 0 ]]; then
@@ -1915,12 +1992,25 @@ sec_apparmor() {
 # ============================================================================
 # SECTION: Login screen and screen lock
 # ============================================================================
+mask_ctrl_alt_del() {
+  local f=/etc/systemd/system/ctrl-alt-del.target
+  # A planted unit file of the same name would make "systemctl mask" fail.
+  if [[ -e $f || -L $f ]]; then backup "$f"; rm -f "$f"; fi
+  if have systemctl && systemctl mask ctrl-alt-del.target; then return 0; fi
+  mkdir -p /etc/systemd/system && ln -sf /dev/null "$f"
+}
+
 sec_desktop() {
   local f
   info "Login screen: no guest account and no automatic login"
   why "A guest session or auto-login lets someone use the computer without any password."
   if [[ -d /etc/lightdm ]]; then
+    # LightDM reads /usr/share/lightdm/lightdm.conf.d, /etc/xdg/lightdm/lightdm.conf.d,
+    # /etc/lightdm/lightdm.conf.d and then /etc/lightdm/lightdm.conf; a later value wins.
+    # [SeatDefaults] is the old name of [Seat:*] and still works, in any of these files.
+    local lightdm_bad='^([[:space:]]*(autologin-user[[:space:]]*=[[:space:]]*[^[:space:]]+|allow-guest[[:space:]]*=[[:space:]]*true|autologin-guest[[:space:]]*=[[:space:]]*true).*)'
     stage_begin /etc/lightdm/lightdm.conf
+    stage_sed "s/$lightdm_bad/#\\1   # disabled by harden.sh/" "disable autologin/guest in every section (also [SeatDefaults])"
     stage_ini "Seat:*" allow-guest false
     stage_ini "Seat:*" greeter-allow-guest false
     stage_ini "Seat:*" autologin-guest false
@@ -1929,11 +2019,11 @@ sec_desktop() {
     stage_ini "Seat:*" greeter-show-manual-login true
     stage_ini "Seat:*" greeter-hide-users true
     stage_commit "LightDM login screen (/etc/lightdm/lightdm.conf)"
-    for f in /etc/lightdm/lightdm.conf.d/*.conf /usr/share/lightdm/lightdm.conf.d/*.conf; do
+    for f in /etc/lightdm/lightdm.conf.d/*.conf /etc/xdg/lightdm/lightdm.conf.d/*.conf /usr/share/lightdm/lightdm.conf.d/*.conf; do
       [[ -f $f ]] || continue
-      grep -Eq '^[[:space:]]*(autologin-user[[:space:]]*=[[:space:]]*[^[:space:]]+|allow-guest[[:space:]]*=[[:space:]]*true|autologin-guest[[:space:]]*=[[:space:]]*true)' "$f" || continue
+      grep -Eq "$lightdm_bad" "$f" || continue
       stage_begin "$f"
-      stage_sed 's/^([[:space:]]*(autologin-user[[:space:]]*=[[:space:]]*[^[:space:]]+|allow-guest[[:space:]]*=[[:space:]]*true|autologin-guest[[:space:]]*=[[:space:]]*true).*)/#\1   # disabled by harden.sh/' "disable autologin/guest"
+      stage_sed "s/$lightdm_bad/#\\1   # disabled by harden.sh/" "disable autologin/guest"
       stage_commit "LightDM override file $f"
     done
   fi
@@ -1950,6 +2040,21 @@ sec_desktop() {
     stage_ini xdmcp Enable false
     stage_commit "GDM login screen ($gdm)"
   fi
+  # Debian and Ubuntu build GDM's own settings from /etc/gdm3/greeter.dconf-defaults
+  # (/usr/share/gdm/generate-config runs each time GDM starts); there is no
+  # /etc/dconf/profile/gdm there, so the dconf method further down never applies.
+  if [[ -f /etc/gdm3/greeter.dconf-defaults ]]; then
+    stage_begin /etc/gdm3/greeter.dconf-defaults
+    stage_ini org/gnome/login-screen disable-user-list true
+    stage_commit "GDM: don't show the list of users (greeter.dconf-defaults)"
+    if [[ $(last_status) == CHANGED ]]; then
+      if [[ -x /usr/share/gdm/generate-config ]]; then
+        fix "Rebuild GDM's settings (the login screen shows it after the next restart)" /usr/share/gdm/generate-config
+      else
+        info "The login screen picks this up the next time it starts (after a restart)."
+      fi
+    fi
+  fi
   for f in /etc/sddm.conf /etc/sddm.conf.d/*.conf; do
     [[ -f $f ]] || continue
     grep -Eq '^[[:space:]]*User[[:space:]]*=[[:space:]]*[^[:space:]]+' "$f" || continue
@@ -1959,10 +2064,24 @@ sec_desktop() {
   done
   if [[ -z $gdm && ! -d /etc/lightdm && ! -f /etc/sddm.conf ]]; then result OK "No graphical login screen found"; fi
 
+  info "Ctrl+Alt+Delete on a text console"
+  why "Anyone at the keyboard could restart the computer with Ctrl+Alt+Delete without logging in."
+  local cad=""
+  [[ -e /lib/systemd/system/ctrl-alt-del.target ]] && cad=/lib/systemd/system/ctrl-alt-del.target
+  [[ -e /usr/lib/systemd/system/ctrl-alt-del.target ]] && cad=/usr/lib/systemd/system/ctrl-alt-del.target
+  if [[ $(readlink /etc/systemd/system/ctrl-alt-del.target 2>/dev/null) == /dev/null ]]; then
+    result OK "Ctrl+Alt+Delete can't restart the computer (ctrl-alt-del.target is masked)"
+  elif [[ -n $cad ]]; then
+    fix "Ctrl+Alt+Delete can't restart the computer (systemctl mask ctrl-alt-del.target)" mask_ctrl_alt_del
+  fi
+
   info "Automatic screen lock"
   why "An unlocked, unattended screen lets anyone walk up and use your account."
+  if ! have dconf && [[ -n $DESKTOP || -d /etc/dconf ]]; then
+    ensure_pkg dconf-cli "the dconf command, which sets desktop settings for every user"
+  fi
   if ! have dconf; then
-    [[ -n $DESKTOP ]] && result REVIEW "dconf is not available - turn on the screen lock by hand in the desktop settings"
+    [[ -n $DESKTOP && $MODE == apply ]] && result REVIEW "dconf is not available - set the screen lock and USB automount by hand in the desktop settings"
     return
   fi
   local mark=${#RESULTS[@]}
@@ -1974,7 +2093,7 @@ sec_desktop() {
   fi
   stage_commit "dconf profile (makes system-wide desktop settings apply)"
   stage_begin /etc/dconf/db/local.d/00-cyberpatriot-screenlock
-  stage_content <<'EOF'
+  stage_content <<'EOF2'
 # Added by the CyberPatriot toolkit (harden.sh)
 [org/gnome/desktop/screensaver]
 lock-enabled=true
@@ -1995,12 +2114,12 @@ idle-delay=uint32 300
 lock-enabled=true
 idle-activation-enabled=true
 
-[org/mate/session]
+[org/mate/desktop/session]
 idle-delay=5
-EOF
+EOF2
   stage_commit "Screen locks after 5 idle minutes (GNOME, Cinnamon, MATE)"
   stage_begin /etc/dconf/db/local.d/locks/00-cyberpatriot-screenlock
-  stage_content <<'EOF'
+  stage_content <<'EOF2'
 /org/gnome/desktop/screensaver/lock-enabled
 /org/gnome/desktop/screensaver/lock-delay
 /org/gnome/desktop/session/idle-delay
@@ -2008,9 +2127,42 @@ EOF
 /org/cinnamon/desktop/screensaver/lock-delay
 /org/cinnamon/desktop/session/idle-delay
 /org/mate/screensaver/lock-enabled
-/org/mate/session/idle-delay
-EOF
+/org/mate/desktop/session/idle-delay
+EOF2
   stage_commit "Users can't turn the screen lock off"
+
+  info "USB drives and CDs: don't mount, open or run them automatically"
+  why "A planted USB stick or CD can start a program the moment it is plugged in."
+  local mh_keys="" sec
+  for sec in org/gnome/desktop/media-handling org/cinnamon/desktop/media-handling org/mate/desktop/media-handling; do
+    mh_keys+="[$sec]"$'\n'"automount=false"$'\n'"automount-open=false"$'\n'"autorun-never=true"$'\n\n'
+  done
+  stage_begin /etc/dconf/db/local.d/00-cyberpatriot-media
+  printf '# Added by the CyberPatriot toolkit (harden.sh)\n%s' "${mh_keys%$'\n'}" | stage_content
+  stage_commit "No automatic mounting/opening/autorun of removable media (GNOME, Cinnamon, MATE)"
+  stage_begin /etc/dconf/db/local.d/locks/00-cyberpatriot-media
+  for sec in org/gnome/desktop/media-handling org/cinnamon/desktop/media-handling org/mate/desktop/media-handling; do
+    printf '/%s/automount\n/%s/automount-open\n/%s/autorun-never\n' "$sec" "$sec" "$sec"
+  done | stage_content
+  stage_commit "Users can't turn automatic mounting back on"
+
+  # dconf reads the keyfiles in name order and the LAST one wins, so another file
+  # in local.d (e.g. a planted 99-something) would override the settings above.
+  local kf
+  for kf in /etc/dconf/db/local.d/*; do
+    [[ -f $kf && $kf != */00-cyberpatriot-* ]] || continue
+    grep -Eq '^[[:space:]]*(lock-enabled|lock-delay|idle-activation-enabled|idle-delay|automount|automount-open|autorun-never)[[:space:]]*=' "$kf" || continue
+    stage_begin "$kf"
+    local out; out=$(mktemp)
+    awk '
+      /^[ \t]*\[/ { s=$0; gsub(/[][ \t]/, "", s)
+                    ours = (s ~ /^org\/(gnome|cinnamon)\/desktop\/(screensaver|session|media-handling)$/ || s ~ /^org\/mate\/(screensaver|desktop\/session|desktop\/media-handling)$/) }
+      ours && /^[ \t]*(lock-enabled|lock-delay|idle-activation-enabled|idle-delay|automount|automount-open|autorun-never)[ \t]*=/ { print "# " $0 "   # overridden by harden.sh"; next }
+      { print }' "$STAGE_TMP" >"$out" && cat "$out" >"$STAGE_TMP"; rm -f "$out"
+    STAGE_CHANGES+=("comment out screen-lock/automount keys that would override harden.sh")
+    stage_commit "dconf file $kf"
+  done
+
   if [[ -f /etc/dconf/profile/gdm ]]; then
     stage_begin /etc/dconf/db/gdm.d/00-cyberpatriot-login-screen
     printf '[org/gnome/login-screen]\ndisable-user-list=true\n' | stage_content
@@ -2018,6 +2170,8 @@ EOF
   fi
   local r changed=0
   for r in "${RESULTS[@]:mark}"; do [[ ${r%%|*} == CHANGED ]] && changed=1; done
+  # Also when an earlier run wrote the files but the database was never rebuilt.
+  [[ ! -f /etc/dconf/db/local ]] || find /etc/dconf/db/local.d -newer /etc/dconf/db/local 2>/dev/null | grep -q . && changed=1
   [[ $changed -eq 1 ]] && fix "Apply the desktop settings (dconf update)" dconf update
   [[ $DESKTOP == xfce ]] && result REVIEW "Xfce doesn't use dconf: set Settings > Xfce Screensaver > Lock Screen by hand"
 }
@@ -2255,7 +2409,7 @@ harden_samba() {
       [[ -z $u ]] && continue
       in_list "$u" $AUTHORIZED_ADMINS $AUTHORIZED_USERS && continue
       result REVIEW "Samba user '$u' is not an authorized user"
-      if ask "Remove '$u' from Samba?" y; then fix "Removed Samba user $u" smbpasswd -x "$u"; fi
+      if [[ $README_USERS_GIVEN -eq 1 ]] && ask "Remove '$u' from Samba?" y; then fix "Removed Samba user $u" smbpasswd -x "$u"; fi
     done < <(pdbedit -L 2>/dev/null | cut -d: -f1)
   fi
   local shares; shares=$(testparm -s 2>/dev/null | grep -E '^\[' | tr -d '[]' | tr '\n' ' ')
@@ -2405,6 +2559,78 @@ sec_updates() {
 }
 
 # ============================================================================
+# SECTION: Web browser (Firefox)
+# ============================================================================
+# Settings an image maker switches OFF to plant a problem. Firefox's own defaults
+# are the safe value, so the fix is to disable the line that turns them off.
+FIREFOX_BAD_PREFS=(
+  "dom.disable_open_during_load"            # Block pop-up windows
+  "xpinstall.whitelist.required"            # Warn when websites try to install add-ons
+  "xpinstall.signatures.required"           # Only signed add-ons
+  "extensions.blocklist.enabled"            # Mozilla's list of known-bad add-ons
+  "browser.safebrowsing.malware.enabled"    # Block dangerous and deceptive content
+  "browser.safebrowsing.phishing.enabled"
+  "browser.safebrowsing.downloads.enabled"  # Block dangerous downloads
+)
+
+sec_browser() {
+  local home f pdir owner key re="" hits running
+  info "Firefox security settings (pop-ups, add-on installs, dangerous sites)"
+  why "Images often switch Firefox's protections off in the settings files. Each one switched back on is often worth points."
+  for key in "${FIREFOX_BAD_PREFS[@]}"; do re+="|${key//./\\.}"; done
+  re="^[[:space:]]*(user_pref|pref|lockPref|defaultPref|sticky_pref)\\([[:space:]]*[\"'](${re#|})[\"'][[:space:]]*,[[:space:]]*false[[:space:]]*\\)"
+  local -a files=() found=()
+  # Each user's profiles (deb/ESR Firefox and the Ubuntu snap): prefs.js holds the
+  # settings, user.js re-applies its values every time Firefox starts.
+  for home in /root $(human_homes); do
+    for pdir in "$home"/.mozilla/firefox/*/ "$home"/snap/firefox/common/.mozilla/firefox/*/; do
+      [[ -d $pdir ]] || continue
+      found+=("$pdir")
+      for f in "$pdir"prefs.js "$pdir"user.js; do [[ -f $f ]] && files+=("$f"); done
+    done
+  done
+  # System-wide preference files that are read by every profile.
+  for f in /etc/firefox/syspref.js /etc/firefox/pref/*.js /etc/firefox-esr/*.js /usr/lib/firefox*/defaults/pref/*.js \
+           /usr/lib/firefox*/browser/defaults/preferences/*.js /usr/lib/firefox*/*.cfg; do
+    [[ -f $f ]] && files+=("$f")
+  done
+  if [[ ${#found[@]} -eq 0 ]]; then
+    result OK "No Firefox profiles found (Firefox was never opened, or isn't installed)"
+  fi
+  local bad=0
+  for f in "${files[@]}"; do
+    mapfile -t hits < <(grep -E "$re" "$f")
+    [[ ${#hits[@]} -eq 0 ]] && continue
+    bad=1
+    result REVIEW "$f switches off Firefox protection(s)"
+    show_list 7 "${hits[@]}"
+    if [[ $(basename "$f") == prefs.js ]]; then
+      owner=$(stat -c %U "$f")
+      running=$(pgrep -u "$owner" -x 'firefox|firefox-bin|firefox-esr' 2>/dev/null | head -1)
+      if [[ -n $running ]]; then
+        result REVIEW "Firefox is open for $owner: it would write the old settings back when it closes. Close it, then run this section again (--only browser)"
+        continue
+      fi
+    fi
+    if ask "Switch these Firefox protections back on (disable the lines in $f)?" y; then
+      stage_begin "$f"
+      stage_sed "s/($re.*)$/\/\/ \1   \/\/ disabled by harden.sh/" "turn Firefox protections back on"
+      stage_commit "Firefox protections in $f"
+    fi
+  done
+  [[ $bad -eq 0 && ${#found[@]} -gt 0 ]] && result OK "No Firefox settings files switch off pop-up blocking, add-on warnings or dangerous-site blocking"
+  local -a pol=()
+  for f in /etc/firefox/policies/policies.json /etc/firefox-esr/policies/policies.json /usr/lib/firefox*/distribution/policies.json; do
+    [[ -f $f ]] && pol+=("$f")
+  done
+  if [[ ${#pol[@]} -gt 0 ]]; then
+    result REVIEW "Firefox policy file(s) found - open about:policies in Firefox and check nothing there turns protections off"
+    show_list 5 "${pol[@]}"
+  fi
+  [[ ${#found[@]} -gt 0 ]] && result REVIEW "Also check by hand in each user's Firefox: HTTPS-Only Mode, saved passwords, and unknown extensions"
+}
+
+# ============================================================================
 # Menu, summary and main
 # ============================================================================
 print_summary() {
@@ -2531,6 +2757,9 @@ main() {
     exit 0
   fi
   [[ $EUID -eq 0 ]] || die "Please run this as root:   sudo bash $0"
+  # New folders and files must not be world-writable (umask 0000) or unreadable
+  # for users (umask 077 makes the dconf database private to root).
+  umask 022
   mkdir -p "$WORK_DIR" && chmod 700 "$WORK_DIR"
   : >"$LOG_FILE"
   printf '# Findings report - %s\n# Items marked REVIEW need a human decision. WOULD = audit mode found something to fix.\n' "$(date)" >"$REPORT_FILE"

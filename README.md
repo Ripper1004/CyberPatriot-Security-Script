@@ -79,7 +79,7 @@ The pages are generated from `docs/` at build time, so **edit `docs/` and the we
 
 | Script | Tests |
 |---|---|
-| Linux | [`tests/linux/run-tests.sh`](tests/linux/run-tests.sh) builds a practice "image" in a **Debian 12, Ubuntu 22.04 and Linux Mint 21.3** container, plants ~30 vulnerabilities (hidden root account, PAM backdoor, cron reverse shell, SUID `find`, fake sudo alias…), runs the script, and checks **55 results**, including real logins with `pamtester`. All pass. |
+| Linux | [`tests/linux/run-tests.sh`](tests/linux/run-tests.sh) builds a practice "image" in a **Debian 12, Ubuntu 22.04, Ubuntu 24.04 and Linux Mint 21.3** container, plants ~30 vulnerabilities (hidden root account, PAM backdoor, cron reverse shell, SUID `find`, fake sudo alias…), runs the script, and checks **73 results**, plus runs with no README list (nothing may be deleted) and under `umask 0000`, including real logins with `pamtester`. All pass. |
 | Windows | [`tests/windows/Test-HardenLogic.ps1`](tests/windows/Test-HardenLogic.ps1) loads the script's functions with fake `secedit.exe` and checks 64 behaviours. The script also parses cleanly and has no PSScriptAnalyzer findings or PowerShell 5.1 syntax problems. **It has not been run on a real Windows image yet.** Try **Audit** mode on a practice image first. |
 | FreeBSD | [`tests/freebsd/test-harden-logic.sh`](tests/freebsd/test-harden-logic.sh) runs the script's decisions on Linux under `dash` with fake FreeBSD commands (`pw`, `sysrc`, `service`...) and checks 50 behaviours, including "never deletes users without a README list". `shellcheck -s sh` clean. **Not yet run on a real FreeBSD system.** |
 

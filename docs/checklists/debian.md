@@ -364,7 +364,7 @@ gsettings get org.gnome.desktop.session idle-delay           # uint32 300
 ### 8.3 Hide the list of users on the login screen
 - [ ] Done
 
-**Script:** ✋ Not done by the script on Debian. Do this by hand.
+**Script:** ✅ Done by the script (`desktop` section).
 
 **What:** Make the GDM login screen ask for a user name instead of showing every account.
 

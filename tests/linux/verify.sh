@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Checks that harden.sh fixed everything plant-vulns.sh broke.
+# shellcheck disable=SC2016  # the checks are run later by bash -c, so $(...) stays literal on purpose
 pass=0; fail=0
 check() {
   local desc=$1; shift
@@ -69,6 +70,27 @@ check "apache config is valid"                   'apache2ctl configtest'
 # desktop / updates / logging
 check "lightdm autologin removed"                '! grep -E "^autologin-user=.+" /etc/lightdm/lightdm.conf'
 check "lightdm guest disabled"                   'grep -q "^allow-guest=false" /etc/lightdm/lightdm.conf'
+LDM='/etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/*.conf /etc/xdg/lightdm/lightdm.conf.d/*.conf'
+check "lightdm: no autologin in any file/section" "! grep -E '^[[:space:]]*autologin-user[[:space:]]*=[[:space:]]*[^[:space:]]' $LDM"
+check "lightdm: no guest in any file/section"    "! grep -E '^[[:space:]]*allow-guest[[:space:]]*=[[:space:]]*true' $LDM"
+check "gdm: user list hidden (greeter file)"     'grep -qx "disable-user-list=true" /etc/gdm3/greeter.dconf-defaults'
+check "gdm: user list hidden (compiled value)"   'd=$(mktemp -d) && cp /etc/gdm3/greeter.dconf-defaults $d/90 && dconf compile $d.db $d && echo file-db:$d.db >$d.p && [ "$(DCONF_PROFILE=$d.p dconf read /org/gnome/login-screen/disable-user-list)" = true ]'
+DREAD='printf "system-db:local\n" >/tmp/dp; DCONF_PROFILE=/tmp/dp dconf read'
+check "dconf: GNOME automount off"               "$DREAD /org/gnome/desktop/media-handling/automount | grep -qx false"
+check "dconf: Cinnamon autorun never"            "$DREAD /org/cinnamon/desktop/media-handling/autorun-never | grep -qx true"
+check "dconf: planted keyfile no longer wins"    "$DREAD /org/cinnamon/desktop/screensaver/lock-enabled | grep -qx true"
+check "dconf: unrelated planted key kept"        "$DREAD /org/gnome/desktop/interface/clock-show-seconds | grep -qx true"
+check "dconf: MATE idle-delay at the real path"  "$DREAD /org/mate/desktop/session/idle-delay | grep -qx 5"
+check "Ctrl+Alt+Del masked"                      '[ "$(readlink /etc/systemd/system/ctrl-alt-del.target)" = /dev/null ]'
+check "core dumps: * hard core 0"                'grep -Eq "^\*[[:space:]]+hard[[:space:]]+core[[:space:]]+0" /etc/security/limits.conf'
+check "core dumps: no limit above 0 left"        '! grep -E "^[^#]*[[:space:]]core[[:space:]]+(unlimited|[1-9])" /etc/security/limits.conf /etc/security/limits.d/*.conf'
+check "core dumps: bob's hard limit is 0 (su -)"   '[ "$(su - bob -c "ulimit -Hc")" = 0 ]'
+check "planted sysctl file in /usr/lib disabled" '! grep -E "^[^#]*tcp_syncookies" /usr/lib/sysctl.d/99-zz-planted.conf'
+FF=/home/bob/.mozilla/firefox/abcd1234.default-release
+check "firefox: pop-up/safe browsing back on"    "! grep -E '^user_pref\(\"(dom\.disable_open|browser\.safebrowsing)' $FF/prefs.js"
+check "firefox: user.js add-on warning back on"  "! grep -E '^user_pref' $FF/user.js"
+check "firefox: other settings kept"             "grep -q '^user_pref(\"browser.startup.homepage' $FF/prefs.js"
+check "firefox: prefs.js still owned by bob"     "[ \"\$(stat -c %U $FF/prefs.js)\" = bob ]"
 check "automatic updates on"                     'grep -q "Unattended-Upgrade \"1\"" /etc/apt/apt.conf.d/20auto-upgrades'
 check "held package released"                    '[ -z "$(apt-mark showhold)" ]'
 check "audit rules installed"                    '[ -f /etc/audit/rules.d/50-cyberpatriot.rules ]'
